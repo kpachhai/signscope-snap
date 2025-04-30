@@ -1,0 +1,24 @@
+{
+  "version": "2.2.3",
+  "description": "MetaMask example snap demonstrating the use of the Transaction Insights API.",
+  "proposedName": "Insights Example Snap",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MetaMask/snaps.git"
+  },
+  "source": {
+    "shasum": "DX3vG9Y5CB4xiXMqSPd09jaBUWc2N9C1SeAhV9DgjAs=",
+    "location": {
+      "npm": {
+        "filePath": "dist/bundle.js",
+        "packageName": "@metamask/insights-example-snap",
+        "registry": "https://registry.npmjs.org/"
+      }
+    }
+  },
+  "initialPermissions": {
+    "endowment:transaction-insight": {}
+  },
+  "platformVersion": "6.22.1",
+  "manifestVersion": "0.1"
+}
