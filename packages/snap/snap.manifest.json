@@ -1,0 +1,29 @@
+{
+  "version": "0.1.0",
+  "description": "SignScope Snap - A deep insight into Hedera transactions",
+  "proposedName": "SignScope",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kpachhai/signscope-snap.git"
+  },
+  "source": {
+    "shasum": "iwiSIL+KpzOtBHiSkIPzg6NPd0HmdMHpkY9PMX9Z6gM=",
+    "location": {
+      "npm": {
+        "filePath": "dist/bundle.js",
+        "packageName": "signscope-snap",
+        "registry": "https://registry.npmjs.org/"
+      }
+    }
+  },
+  "initialPermissions": {
+    "snap_dialog": {},
+    "endowment:rpc": {
+      "dapps": true,
+      "snaps": false
+    },
+    "endowment:transaction-insight": {}
+  },
+  "platformVersion": "6.18.0",
+  "manifestVersion": "0.1"
+}

@@ -1,51 +1,53 @@
-# `@metamask/transaction-insights-example-snap`
+# @metamask/template-snap-monorepo
 
-This snap demonstrates how to use the `endowment:transaction-insight` permission
-to provide transaction insights to the user. This snap uses the `onTransaction`
-handler to provide insights for transactions that are sent by the user.
+This repository demonstrates how to develop a snap with TypeScript. For detailed
+instructions, see [the MetaMask documentation](https://docs.metamask.io/guide/snaps.html#serving-a-snap-to-your-local-environment).
 
-Transaction insights are displayed in the transaction confirmation screen, and
-can show any [Snaps-based UI](../../../snaps-sdk) components.
+MetaMask Snaps is a system that allows anyone to safely expand the capabilities
+of MetaMask. A _snap_ is a program that we run in an isolated environment that
+can customize the wallet experience.
 
-## Snap manifest
+## Snaps is pre-release software
 
-> **Note**: Using `onTransaction` requires the `endowment:transaction-insight`
-> permissions. Refer to [the documentation](https://docs.metamask.io/snaps/reference/permissions/#endowmenttransaction-insight)
-> for more information.
+To interact with (your) Snaps, you will need to install [MetaMask Flask](https://metamask.io/flask/),
+a canary distribution for developers that provides access to upcoming features.
 
-Along with other permissions, the manifest of this snap includes the
-`endowment:transaction-insight` permission:
+## Getting Started
 
-```json
-{
-  "initialPermissions": {
-    "endowment:transaction-insight": {}
-  }
-}
+Clone the template-snap repository [using this template](https://github.com/MetaMask/template-snap-monorepo/generate)
+and set up the development environment:
+
+```shell
+yarn install && yarn start
 ```
 
-By default, the `onTransaction` does not receive the transaction origin. If you
-want to receive the origin, you can add the `allowTransactionOrigin` property to
-the permission definition:
+## Cloning
 
-```json
-{
-  "initialPermissions": {
-    "endowment:transaction-insight": {
-      "allowTransactionOrigin": true
-    }
-  }
-}
-```
+This repository contains GitHub Actions that you may find useful, see
+`.github/workflows` and [Releasing & Publishing](https://github.com/MetaMask/template-snap-monorepo/edit/main/README.md#releasing--publishing)
+below for more information.
 
-## Snap usage
+If you clone or create this repository outside the MetaMask GitHub organization,
+you probably want to run `./scripts/cleanup.sh` to remove some files that will
+not work properly outside the MetaMask GitHub organization.
 
-This snap exposes an `onTransaction` handler, which is called when a transaction
-is sent by the user. The handler receives the transaction details and the
-transaction origin (if the `allowTransactionOrigin` property is set to `true`).
+If you don't wish to use any of the existing GitHub actions in this repository,
+simply delete the `.github/workflows` directory.
 
-The snap decodes the transaction data and returns the decoded data as the
-transaction insight.
+## Contributing
 
-For more information, you can refer to
-[the end-to-end tests](./src/index.test.ts).
+### Testing and Linting
+
+Run `yarn test` to run the tests once.
+
+Run `yarn lint` to run the linter, or run `yarn lint:fix` to run the linter and
+fix any automatically fixable issues.
+
+### Using NPM packages with scripts
+
+Scripts are disabled by default for security reasons. If you need to use NPM
+packages with scripts, you can run `yarn allow-scripts auto`, and enable the
+script in the `lavamoat.allowScripts` section of `package.json`.
+
+See the documentation for [@lavamoat/allow-scripts](https://github.com/LavaMoat/LavaMoat/tree/main/packages/allow-scripts)
+for more information.
