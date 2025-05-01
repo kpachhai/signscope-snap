@@ -38,7 +38,7 @@ export function decodeData(data: string) {
     (value) => value.signature === signature,
   );
 
-  return functionSignature?.name ?? 'Unknown';
+  return functionSignature?.name ?? 'Contract Call';
 }
 
 /**
