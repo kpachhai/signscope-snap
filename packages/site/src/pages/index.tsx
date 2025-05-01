@@ -283,7 +283,6 @@ const TransferTokenComponent = () => {
       alert(`Transaction sent! Hash: ${tx.hash}`);
     } catch (error: any) {
       console.error(error);
-      alert(`Error: ${error.message}`);
     }
   };
 
