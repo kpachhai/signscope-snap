@@ -403,23 +403,13 @@ export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
     geminiAPIKey: string;
   };
 
-  try {
-    await saveValue('whiteList', formValues.whiteList);
-    await saveValue('banList', formValues.banList);
-    await saveValue('warnOver', formValues.warnOver);
-    await saveValue(
-      'onlyVerifiedSmartContract',
-      formValues.onlyVerifiedSmartContract.toString(),
-    );
-    await saveValue('sourcifyURL', formValues.sourcifyURL);
-    await saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
-    await saveValue('geminiAPIKey', formValues.geminiAPIKey);
-  } catch (error) {
-    console.error('❌ Error saving some preferences:', error);
-    return;
-  }
-
-  console.log('✅ All preferences saved. Updating UI...');
+  saveValue('whiteList', formValues.whiteList);
+  saveValue('banList', formValues.banList);
+  saveValue('warnOver', formValues.warnOver);
+  saveValue('onlyVerifiedSmartContract', formValues.onlyVerifiedSmartContract.toString());
+  saveValue('sourcifyURL', formValues.sourcifyURL);
+  saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
+  saveValue('geminiAPIKey', formValues.geminiAPIKey);
 
   await snap.request({
     method: 'snap_updateInterface',
