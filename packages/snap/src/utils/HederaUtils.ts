@@ -38,7 +38,7 @@ export class HederaUtils {
     mirrorNodeUrl: string,
   ): Promise<MirrorTokenInfo> {
     let result = {} as MirrorTokenInfo;
-    const url = `${mirrorNodeUrl}/api/v1/tokens/${encodeURIComponent(tokenId)}`;
+    const url = `${mirrorNodeUrl}/tokens/${encodeURIComponent(tokenId)}`;
     const response: FetchResponse = await FetchUtils.fetchDataFromUrl(url);
     if (response.success) {
       result = response.data;
@@ -52,7 +52,7 @@ export class HederaUtils {
     mirrorNodeUrl: string,
   ): Promise<MirrorNftInfo[]> {
     let result = [] as MirrorNftInfo[];
-    const url = `${mirrorNodeUrl}/api/v1/tokens/${encodeURIComponent(tokenId)}/nfts?account.id=${encodeURIComponent(accountId)}`;
+    const url = `${mirrorNodeUrl}/tokens/${encodeURIComponent(tokenId)}/nfts?account.id=${encodeURIComponent(accountId)}`;
     const response: FetchResponse = await FetchUtils.fetchDataFromUrl(url);
     if (response.success) {
       result = response.data.nfts;
@@ -65,7 +65,7 @@ export class HederaUtils {
     mirrorNodeUrl: string,
   ): Promise<AccountInfo> {
     const result = {} as AccountInfo;
-    const url = `${mirrorNodeUrl}/api/v1/accounts/${encodeURIComponent(idOrAliasOrEvmAddress)}`;
+    const url = `${mirrorNodeUrl}/accounts/${encodeURIComponent(idOrAliasOrEvmAddress)}`;
     const response: FetchResponse = await FetchUtils.fetchDataFromUrl(url);
     if (!response.success) {
       return result;

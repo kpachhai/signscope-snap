@@ -3,6 +3,7 @@ import { remove0x } from '@metamask/utils';
 
 import type { FetchResponse } from './utils/FetchUtils';
 import { FetchUtils } from './utils/FetchUtils';
+import { getValue } from './utils';
 
 export type GeminiResult = {
   functionName: string;
@@ -12,12 +13,12 @@ export type GeminiResult = {
   metadata: Record<string, string>;
 };
 
-const GEMINI_API_KEY = 'YOUR_API_KEY'; // Replace securely
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 
 export async function getGeminiDecodedInsight(
   abi: object[],
   data: string,
+  geminiApiKey: string,
 ): Promise<GeminiResult | null> {
   const prompt = `
 You are a blockchain security expert. Given a smart contract ABI and a transaction payload (function selector and calldata), perform the following:
@@ -52,7 +53,7 @@ ${remove0x(data)}
   };
 
   const response: FetchResponse = await FetchUtils.postDataToUrl(
-    GEMINI_ENDPOINT,
+    GEMINI_ENDPOINT.concat(geminiApiKey),
     body,
   );
   if (response.success) {

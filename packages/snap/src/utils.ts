@@ -20,6 +20,17 @@ const FUNCTION_SIGNATURES = [
   },
 ];
 
+export function extractChainId(chainId: string): string {
+  const parts = chainId.split(':');
+  if (parts.length === 2 && parts[0] === 'eip155') {
+    if (!parts[1]) {
+      throw new Error(`Invalid chainId format: ${chainId}`);
+    }
+    return parts[1];
+  }
+  throw new Error(`Invalid chainId format: ${chainId}`);
+}
+
 /**
  * Simple signature matching decoder.
  *
