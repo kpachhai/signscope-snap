@@ -27,6 +27,7 @@ import {
   Checkbox,
   Button,
   Form,
+  Row,
 } from '@metamask/snaps-sdk/jsx';
 import { assert } from '@metamask/utils';
 
@@ -370,19 +371,33 @@ export const onTransaction: OnTransactionHandler = async ({
   }
 
   // Check if the transaction is valid based on user preferences
-  const validationResult = validateTransaction(transaction);
+  const validationResult = await validateTransaction(transaction, transactionTo);
+
   if (validationResult.shouldBeBlocked()) {
     // Handle blocking issues
     const blockingIssues = validationResult.getBlockingIssues();
     console.log('Blocking issues:', blockingIssues);
-    rows.unshift(row('Blocking issues', text(blockingIssues.join(', '))));
-    return { content: panel(rows), severity: SeverityLevel.Critical };
+    return {
+      content: panel([
+        row('Blocking issues:',  text(blockingIssues.join(', ')), RowVariant.Critical),
+        row('Operation', text(operation)),
+        row('Sender', text(senderAccountInfo.accountId)),
+        ...rows,
+      ]),
+    };
+
   } else if (validationResult.containsWarnings()) {
     // Handle warnings
     const warningList = validationResult.getWarnings();
     console.log('Warnings:', warningList);
-    rows.unshift(row('Warnings', text(warningList.join(', '))));
-    return { content: panel(rows) };
+    return {
+      content: panel([
+        row('Warnings:',  text(warningList.join(', ')), RowVariant.Warning),
+        row('Operation', text(operation)),
+        row('Sender', text(senderAccountInfo.accountId)),
+        ...rows,
+      ]),
+    };
   }
 
   return {
@@ -425,14 +440,14 @@ export const onHomePage: OnHomePageHandler = async () => {
   // Create the form
   const formComponent = (
     <Form name="preferences">
-      <Field label="White list. Transactions to contracts in this list will be automatically approved.">
+      <Field label="White list. Transactions to contracts in this list will not be checked for validity.">
         <Input
           name="whiteList"
           placeholder="Insert comma separated addresses."
           value={form.whiteList as string}
         />
       </Field>
-      <Field label="Ban list. Transactions to contracts in this list will be automatically denied">
+      <Field label="Ban list. Transactions sent to these contracts will be flagged as blocked.">
         <Input
           name="banList"
           placeholder="Insert comma separated addresses."
@@ -444,6 +459,7 @@ export const onHomePage: OnHomePageHandler = async () => {
           name="warnOver"
           type="number"
           placeholder="Amount in HBAR."
+          step={1}
           value={form.warnOver as string}
         />
       </Field>
@@ -473,7 +489,7 @@ export const onHomePage: OnHomePageHandler = async () => {
       <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
         <Input
           name="geminiAPIKey"
-          placeholder="XXX"
+          type='password'
           value={form.geminiAPIKey as string}
         />
       </Field>

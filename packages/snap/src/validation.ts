@@ -1,4 +1,5 @@
 import type { Transaction } from '@metamask/snaps-sdk';
+import { getValue } from './utils';
 
 /**
  * Interface defining the validation result object
@@ -46,32 +47,34 @@ type ValidationResult = {
  * @param transaction - The transaction string to validate
  * @returns Validation result object with methods to check status and get issues
  */
-export function validateTransaction(
-  transaction: Transaction,
-): ValidationResult {
+export async function validateTransaction(
+transaction: Transaction, transactionTo: string,
+): Promise<ValidationResult> {
   // Initialize arrays to store any validation issues
   const blockingIssues: string[] = [];
   const warnings: string[] = [];
 
-  // Perform validation checks
-  // This is where you would add your specific validation logic
-  if (!transaction || typeof transaction !== 'string') {
-    //blockingIssues.push('Transaction must be a non-empty string');
+  let banList = (await getValue('banList'))?.toString();
+  let whiteList = (await getValue('whiteList'))?.toString();
+  const warnOverValue = await getValue('warnOver');
+  let warnOver = warnOverValue ? parseInt(warnOverValue.toString()) : 999999999;
+
+  // Check only if the transaction is not in the whitelist
+  if (whiteList && whiteList.length > 0 && (whiteList.includes(transactionTo) || whiteList.includes(transaction.to))) {
+    // no need to check the transaction
+    console.log('Transaction in whitelist');
   } else {
-    // if (transaction.length < 10) {
-    //   blockingIssues.push('Transaction is too short (minimum 10 characters)');
-    // }
-    // if (!/^[a-zA-Z0-9\-_]+$/u.test(transaction)) {
-    //   blockingIssues.push('Transaction contains invalid characters');
-    // }
-    // if (transaction.length > 50) {
-    //   warnings.push('Transaction is unusually long');
-    // }
-    // if (!transaction.includes('-')) {
-    //   warnings.push(
-    //     'Transaction should typically include separator characters',
-    //   );
-    // }
+    if(banList && banList.length > 0 && (banList.includes(transactionTo) || banList.includes(transaction.to))) {
+      blockingIssues.push(`Recipient or contract in the ban list!`);
+    }
+
+    if(transaction.value) {
+      let decimalValue = parseInt(transaction.value, 16);
+      let hbarValue = decimalValue / 1e18;
+      if(hbarValue > warnOver) {
+        warnings.push(`Transaction value (${hbarValue} HBAR) exceeds the warning threshold (${warnOver} HBAR).`);
+      }
+    }
   }
 
   // Return object with methods to check status and get issues
@@ -96,4 +99,11 @@ export function validateTransaction(
       return blockingIssues.length === 0;
     },
   };
+}
+
+export async function isInWhitelist(
+  transactionTo: string
+): Promise<boolean> {
+  let whiteList = (await getValue('whiteList'))?.toString();
+  return whiteList ? whiteList.includes(transactionTo) : false;
 }
