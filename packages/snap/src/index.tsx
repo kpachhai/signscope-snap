@@ -24,8 +24,9 @@ import {
 import { assert, hasProperty } from '@metamask/utils';
 
 import type { AccountInfo } from './types/account';
-import { decodeData } from './utils';
 import { HederaUtils } from './utils/HederaUtils';
+import { decodeData, getValue, saveValue } from './utils';
+import { validateTransaction } from './validation';
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
@@ -63,50 +64,60 @@ export const onTransaction: OnTransactionHandler = async ({
         row(
           'Network Error',
           text(
-            'Please connect to Hedera Mainnet|Testnet|Previewnet to enable the insight',
+            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the insight',
           ),
         ),
       ]),
     };
   }
 
+  // Check
+  const validationResult = validateTransaction(transaction);
+  if (validationResult.shouldBeBlocked()) {
+    // Handle blocking issues
+    let blockingIssues = validationResult.getBlockingIssues();
+  } else if (validationResult.containsWarnings()) {
+    // Handle warnings
+    let warningList = validationResult.getWarnings();
+  }
+
+  const transactionFrom = transaction.from as `0x${string}`;
+  const transactionTo = transaction.to
+    ? (transaction.to as `0x${string}`)
+    : 'N/A';
+
+  // Check if it's a valid hedera accountId
+  let accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
+    transactionFrom,
+    'https://testnet.mirrornode.hedera.com',
+  );
+  if (!accountInfo.accountId) {
+    accountInfo = {} as AccountInfo;
+    accountInfo.accountId = 'N/A';
+  }
+
+  console.log('Account info:', accountInfo);
+
+  let type = 'N/A';
   if (
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
   ) {
-    // Check if it's a valid hedera accountId
-    const transactionFrom = transaction.from as `0x${string}`;
-    const accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
-      transactionFrom,
-      'https://testnet.mirrornode.hedera.com',
-    );
-    if (!accountInfo) {
-      return {
-        content: panel([
-          row(
-            'Invalid accountId',
-            text('This account has no account Id associated with it'),
-          ),
-        ]),
-      };
-    }
-
-    const transactionTo = transaction.to
-      ? (transaction.to as `0x${string}`)
-      : 'N/A';
-    const type = decodeData(transaction.data);
-    return {
-      content: panel([
-        row('From(EVM Address)', address(transactionFrom)),
-        row('From(Account Id)', text(accountInfo.accountId)),
-        row('To', text(transactionTo)),
-        row('Transaction type', text(type)),
-      ]),
-      severity: SeverityLevel.Critical,
-    };
+    // Smart contract dedicated functions
+    type = decodeData(transaction.data);
+  } else {
+    // Normal transfer
+    type = 'HBAR Transfer';
   }
 
-  return { content: panel([row('Transaction type', text('Unknown'))]) };
+  return {
+    content: panel([
+      row('From (Account Id)', text(accountInfo.accountId)),
+      row('To', text(transactionTo)),
+      row('Transaction type', text(type)),
+    ]),
+    severity: SeverityLevel.Critical,
+  };
 };
 
 /**
