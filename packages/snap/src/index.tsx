@@ -4,8 +4,7 @@ import type { OnTransactionHandler } from '@metamask/snaps-sdk';
 import { SeverityLevel, panel, text, row, address } from '@metamask/snaps-sdk';
 import { hasProperty } from '@metamask/utils';
 
-import { decodeData } from './utils';
-
+import { decodeData, getValue, saveValue } from './utils';
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
