@@ -338,7 +338,6 @@ const OverflowContractComponent = () => {
       alert(`Transaction sent! Hash: ${tx.hash}`);
     } catch (error: any) {
       console.error(error);
-      alert(`Error: ${error.message}`);
     }
   };
 
@@ -397,7 +396,6 @@ const ReentryComponent = () => {
       alert(`Transaction sent! Hash: ${tx.hash}`);
     } catch (error: any) {
       console.error(error);
-      alert(`Error: ${error.message}`);
     }
   };
 
@@ -427,7 +425,6 @@ const ReentryComponent = () => {
       alert(`Transaction sent! Hash: ${tx.hash}`);
     } catch (error: any) {
       console.error(error);
-      alert(`Error: ${error.message}`);
     }
   };
 
