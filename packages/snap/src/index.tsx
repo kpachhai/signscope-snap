@@ -26,6 +26,19 @@ function isHTS(inputString: string) {
   return inputString.startsWith('0x00000000000');
 }
 
+async function fetchABI(contractAddres: string) {
+  try {
+    const response = await fetch(
+      'https://server-verify.hashscan.io/files/any/296/' + contractAddres,
+    );
+    if (!response.ok) throw new Error('Network response was not ok');
+    const data = await response.json();
+    return data.files[0].content;
+  } catch (error) {
+    console.error('Fetch error:', error);
+  }
+}
+
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
  * method. This handler decodes the transaction data, and displays the type of
@@ -50,9 +63,17 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
   ) {
-    const iface = new ethers.Interface(erc20Abi);
+    const isHTSToken = isHTS(transaction.to);
+
+    let abi;
+    if (isHTSToken) {
+      abi = erc20Abi;
+    } else {
+      abi = await JSON.parse(await fetchABI(transaction.to)).output.abi;
+    }
+    const iface = new ethers.Interface(abi);
     const decodedData = iface.parseTransaction({ data: transaction.data });
-    const isHTSToken = isHTS(transaction.to).toString();
+
     let args = 'null';
     let signature = 'null';
     if (decodedData) {
@@ -73,7 +94,7 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
         ),
         row('Signature', text(signature)),
         row('Arguments', text(args)),
-        row('Hedera native token', text(isHTSToken)),
+        row('Hedera native token', text(`${isHTSToken}`)),
       ]),
       severity: SeverityLevel.Critical,
     };
