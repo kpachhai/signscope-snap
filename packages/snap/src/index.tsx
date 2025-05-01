@@ -14,6 +14,7 @@ import {
   row,
   UserInputEventType,
   RowVariant,
+  divider,
 } from '@metamask/snaps-sdk';
 import {
   Box,
@@ -24,6 +25,7 @@ import {
   Input,
   Container,
   Checkbox,
+  Section,
   Button,
   Form,
 } from '@metamask/snaps-sdk/jsx';
@@ -288,6 +290,7 @@ export const onTransaction: OnTransactionHandler = async ({
               }
 
               const insightRows = [
+                divider(),
                 row('🔍 AI Security Insight', text('')),
 
                 !isFunctionMatch
@@ -369,6 +372,11 @@ export const onTransaction: OnTransactionHandler = async ({
             row('Contract Verified', text('False'), RowVariant.Critical),
             row('Hedera Native Token', text(`False`)),
           ];
+          if(await getValue('onlyVerifiedSmartContract') === 'true') {
+            rows.unshift(
+              row('Warnings:',text('The contract is not verified. Please verify the contract to interact with it.',),RowVariant.Critical,),
+            );
+          }
         }
         operation = decodeData(transaction.data);
       }
@@ -389,10 +397,23 @@ export const onTransaction: OnTransactionHandler = async ({
     transactionTo,
   );
 
+  if (validationResult.containsWarnings()) {
+    // Handle warnings
+    const warningList = validationResult.getWarnings();
+    return {
+      content: panel([
+        row('Warnings:', text(warningList.join(', ')), RowVariant.Warning),
+        divider(),
+        row('Operation', text(operation)),
+        row('Sender', text(senderAccountInfo.accountId)),
+        ...rows,
+      ]),
+    };
+  }
+
   if (validationResult.shouldBeBlocked()) {
     // Handle blocking issues
     const blockingIssues = validationResult.getBlockingIssues();
-    console.log('Blocking issues:', blockingIssues);
     return {
       content: panel([
         row(
@@ -400,18 +421,7 @@ export const onTransaction: OnTransactionHandler = async ({
           text(blockingIssues.join(', ')),
           RowVariant.Critical,
         ),
-        row('Operation', text(operation)),
-        row('Sender', text(senderAccountInfo.accountId)),
-        ...rows,
-      ]),
-    };
-  } else if (validationResult.containsWarnings()) {
-    // Handle warnings
-    const warningList = validationResult.getWarnings();
-    console.log('Warnings:', warningList);
-    return {
-      content: panel([
-        row('Warnings:', text(warningList.join(', ')), RowVariant.Warning),
+        divider(),
         row('Operation', text(operation)),
         row('Sender', text(senderAccountInfo.accountId)),
         ...rows,
@@ -459,6 +469,8 @@ export const onHomePage: OnHomePageHandler = async () => {
   // Create the form
   const formComponent = (
     <Form name="preferences">
+      <Section>
+      <Heading>Warning preferences</Heading>
       <Field label="White list. Transactions to contracts in this list will not be checked for validity.">
         <Input
           name="whiteList"
@@ -482,15 +494,14 @@ export const onHomePage: OnHomePageHandler = async () => {
           value={form.warnOver as string}
         />
       </Field>
-      <Text> </Text>
       <Checkbox
         name="onlyVerifiedSmartContract"
         label="Interact with verified contracts only."
         checked={form.onlyVerifiedSmartContract}
       />
-      <Text> </Text>
+      </Section>
+      <Section>
       <Heading>External services configuration</Heading>
-      <Text> </Text>
       <Field label="Sourcify API URL. If not specified, the public Hashscan sourcify server will be used.">
         <Input
           name="sourcifyURL"
@@ -509,9 +520,11 @@ export const onHomePage: OnHomePageHandler = async () => {
         <Input
           name="geminiAPIKey"
           type="password"
+          placeholder="aBcD..."
           value={form.geminiAPIKey as string}
         />
       </Field>
+      </Section>
     </Form>
   );
   // Create the container
@@ -523,7 +536,6 @@ export const onHomePage: OnHomePageHandler = async () => {
           Here you can configure some options to customize your experience.
         </Text>
         {formComponent}
-        <Text> </Text>
         <Button type="submit" form="preferences">
           Save preferences
         </Button>
