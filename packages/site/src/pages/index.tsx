@@ -1,6 +1,6 @@
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { ethers } from 'ethers';
+import { BrowserProvider, Contract, parseUnits } from 'ethers';
 import { useState } from 'react';
 import styled from 'styled-components';
 
@@ -226,10 +226,19 @@ const Input = styled.input`
   font-size: 1rem;
 `;
 
+type ERC20 = {
+  decimals(): Promise<number>;
+  transfer(to: string, amount: bigint): Promise<any>;
+};
+
 const TransferTokenComponent = () => {
-  const [contractAddress, setContractAddress] = useState('');
-  const [toAddress, setToAddress] = useState('');
-  const [amount, setAmount] = useState('');
+  const [contractAddress, setContractAddress] = useState(
+    '0x0b16eaa7d12085f1288fcf1544dbc6c55e74de58',
+  );
+  const [toAddress, setToAddress] = useState(
+    '0xb9c5b17296cd623facd33293e345c45d5c5f2489',
+  );
+  const [amount, setAmount] = useState('1');
 
   const handleTransfer = async () => {
     if (!(window as any).ethereum) {
@@ -238,19 +247,21 @@ const TransferTokenComponent = () => {
     }
 
     try {
-      const provider = new ethers.providers.Web3Provider(
-        (window as any).ethereum,
-      );
-      const signer = provider.getSigner();
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
 
       const erc20Abi = [
         'function transfer(address to, uint256 amount) public returns (bool)',
         'function decimals() public view returns (uint8)',
       ];
-      const contract = new ethers.Contract(contractAddress, erc20Abi, signer);
+      const contract = new Contract(
+        contractAddress,
+        erc20Abi,
+        signer,
+      ) as unknown as ERC20;
 
-      const decimals = await contract.decimals();
-      const parsedAmount = ethers.utils.parseUnits(amount, decimals);
+      const decimals: number = await contract.decimals();
+      const parsedAmount = parseUnits(amount, decimals);
 
       const tx = await contract.transfer(toAddress, parsedAmount);
       await tx.wait();
