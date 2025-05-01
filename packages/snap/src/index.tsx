@@ -81,23 +81,13 @@ export const onTransaction: OnTransactionHandler = async ({
     return {
       content: panel([
         row(
-          'Network Error',
+          'Unsupported Network',
           text(
-            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the insight',
+            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the Transaction Insights',
           ),
         ),
       ]),
     };
-  }
-
-  // Check
-  const validationResult = validateTransaction(transaction);
-  if (validationResult.shouldBeBlocked()) {
-    // Handle blocking issues
-    const blockingIssues = validationResult.getBlockingIssues();
-  } else if (validationResult.containsWarnings()) {
-    // Handle warnings
-    const warningList = validationResult.getWarnings();
   }
 
   const transactionFrom = transaction.from as `0x${string}`;
@@ -114,6 +104,8 @@ export const onTransaction: OnTransactionHandler = async ({
     accountInfo = {} as AccountInfo;
     accountInfo.accountId = 'N/A';
   }
+
+  console.log('Account info:', accountInfo);
 
   let type = 'N/A';
   let rows: any[] = [];
@@ -171,13 +163,28 @@ export const onTransaction: OnTransactionHandler = async ({
     type = 'HBAR Transfer';
   }
 
+  // Check if the transaction is valid based on user preferences
+  const validationResult = validateTransaction(transaction);
+  if (validationResult.shouldBeBlocked()) {
+    // Handle blocking issues
+    const blockingIssues = validationResult.getBlockingIssues();
+    console.log('Blocking issues:', blockingIssues);
+    rows.unshift(row('Blocking issues', text(blockingIssues.join(', '))));
+    return { content: panel(rows), severity: SeverityLevel.Critical };
+  } else if (validationResult.containsWarnings()) {
+    // Handle warnings
+    const warningList = validationResult.getWarnings();
+    console.log('Warnings:', warningList);
+    rows.unshift(row('Warnings', text(warningList.join(', '))));
+    return { content: panel(rows) };
+  }
+
   return {
     content: panel([
-      row('From (Account Id)', text(accountInfo.accountId)),
       row('Transaction type', text(type)),
-      ...rows,
+      row('From (Account Id)', text(accountInfo.accountId)),
+      row('To (Account Id)', text(transactionTo)),
     ]),
-    severity: SeverityLevel.Critical,
   };
 };
 
@@ -196,7 +203,7 @@ export const onHomePage: OnHomePageHandler = async () => {
           <Text>Welcome to my Snap home page!</Text>
         </Box>
         <Footer>
-          <Button name="footer_button">Footer button</Button>
+          <Button name="footer_button">Configure preferences</Button>
         </Footer>
       </Container>
     ),
@@ -217,6 +224,19 @@ export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
   // directly.
   assert(event.type === UserInputEventType.ButtonClickEvent);
   assert(event.name === 'footer_button');
+
+  await snap.request({
+    method: "snap_dialog",
+    params: {
+      type: "alert",
+      content: (
+        <Box>
+          <Heading>Alert heading</Heading>
+          <Text>Something happened in the system.</Text>
+        </Box>
+      ),
+    },
+  });
 
   await snap.request({
     method: 'snap_updateInterface',
