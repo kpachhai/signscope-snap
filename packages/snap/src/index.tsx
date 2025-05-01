@@ -10,21 +10,25 @@ import {
   text,
   row,
   UserInputEventType,
+  RowVariant,
 } from '@metamask/snaps-sdk';
 import {
   Box,
   Text,
   Bold,
   Heading,
+  Field,
+  Input,
   Container,
-  Footer,
+  Checkbox,
   Button,
+  Form,
 } from '@metamask/snaps-sdk/jsx';
 import { assert } from '@metamask/utils';
 
 import { getGeminiDecodedInsight, type GeminiResult } from './llm';
 import type { AccountInfo } from './types/account';
-import { decodeData } from './utils';
+import { decodeData, saveValue, getValue, extractChainId } from './utils';
 import type { FetchResponse } from './utils/FetchUtils';
 import { FetchUtils } from './utils/FetchUtils';
 import { decodeTransaction, HederaUtils, isHTS } from './utils/HederaUtils';
@@ -72,47 +76,73 @@ export const onTransaction: OnTransactionHandler = async ({
   transaction,
   chainId,
 }) => {
+
+  // Check if the transaction is valid based on user preferences
+  let chainID = extractChainId(chainId);
+
   if (
-    chainId !== 'eip155:295' && // Mainnet
-    chainId !== 'eip155:296' && // Testnet
-    chainId !== 'eip155:297' // Previewnet
+    chainID !== '295' && // Mainnet
+    chainID !== '296' && // Testnet
+    chainID !== '297' // Previewnet
   ) {
     return {
       content: panel([
         row(
-          'Unsupported Network',
+          `Unsupported Network (chainID: ${chainID})`,
           text(
-            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the Transaction Insights',
+            'Please connect to Hedera Mainnet (295), Testnet (296) or Previewnet (297) to enable the Transaction Insights',
           ),
         ),
       ]),
     };
   }
 
-  const transactionFrom = transaction.from as `0x${string}`;
-  const transactionTo = transaction.to
-    ? (transaction.to as `0x${string}`)
-    : 'N/A';
-
-  // Check if it's a valid hedera accountId
-  let accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
-    transactionFrom,
-    'https://testnet.mirrornode.hedera.com',
-  );
-  if (!accountInfo.accountId) {
-    accountInfo = {} as AccountInfo;
-    accountInfo.accountId = 'N/A';
+  let mirrorNodeURL = await getValue('mirrorNodeURL');
+  if (!mirrorNodeURL) {
+    switch (chainID) {
+      case '295':
+        mirrorNodeURL = 'https://mainnet.mirrornode.hedera.com/api/v1';
+        break;
+      case '296':
+        mirrorNodeURL = 'https://testnet.mirrornode.hedera.com/api/v1';
+        break;
+      case '297':
+        mirrorNodeURL = 'https://previewnet.mirrornode.hedera.com/api/v1';
+        break;
+      default:
+        mirrorNodeURL = 'https://testnet.mirrornode.hedera.com/api/v1';
+        break;
+    }
   }
 
-  let type = 'N/A';
+  const transactionFrom = transaction.from as `0x${string}`;
+  let senderAccountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(transactionFrom, mirrorNodeURL.toString(),);
+  if (!senderAccountInfo.accountId) {
+    senderAccountInfo = {} as AccountInfo;
+    senderAccountInfo.accountId = 'N/A';
+  }
+
+  let transactionTo = 'N/A'
+  if(transaction.to) {
+    transactionTo = transaction.to as `0x${string}`;
+    let recipientAccountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(transactionTo, mirrorNodeURL.toString(),);
+    if (recipientAccountInfo.accountId) transactionTo = recipientAccountInfo.accountId;
+  }
+
+  console.log('Transaction to:', transactionTo);
+
+  let operation = 'N/A';
   let rows: any[] = [];
 
-  if (transaction.data) {
+  if (transaction.data && transaction.data !== '0x') {
+
+    console.log('Transaction data:', transaction.data);
+
     const isContractCreate =
       transaction.to === null || transaction.to === undefined;
     // do the ABI retrieval
     if (isContractCreate) {
-      type = 'Contract Create';
+      operation = 'Create Contract';
     } else {
       const isHTSToken = isHTS(transaction.to);
       let abi = [];
@@ -121,15 +151,16 @@ export const onTransaction: OnTransactionHandler = async ({
         const { signature, args } = decodeTransaction(abi, transaction.data);
 
         rows = [
-          row('To', text(transactionTo)),
+          row('Contract', text(transactionTo)),
           row('Signature', text(signature)),
           row('Arguments', text(args)),
-          row('Verified', text('True')),
-          row('Hedera native token', text(`True`)),
+          row('Contract Verified', text('True')),
+          row('Hedera Native Token', text(`True`)),
         ];
       } else {
+        let sourcifyURL = await getValue('sourcifyURL') || 'https://server-verify.hashscan.io';
         const response: FetchResponse = await FetchUtils.fetchDataFromUrl(
-          `https://server-verify.hashscan.io/files/any/296/${transaction.to}`,
+          `${sourcifyURL}/files/any/${chainID}/${transaction.to}`,
         );
 
         if (response.success) {
@@ -137,15 +168,14 @@ export const onTransaction: OnTransactionHandler = async ({
 
           const { signature, args } = decodeTransaction(abi, transaction.data);
 
-          const geminiResult: GeminiResult | null =
-            await getGeminiDecodedInsight(abi, transaction.data);
+          const geminiResult: GeminiResult | null = await getGeminiDecodedInsight(abi, transaction.data, (await getValue('geminiAPIKey'))?.toString() || '');
 
           rows = [
-            row('To', text(transactionTo)),
+            row('Contract', text(transactionTo)),
             row('Signature', text(signature)),
             row('Arguments', text(args)),
-            row('Verified', text('True')),
-            row('Hedera native token', text(`False`)),
+            row('Contract Verified', text('True')),
+            row('Hedera Native Token', text(`False`)),
             geminiResult
               ? row('Function', text(geminiResult.functionName))
               : row('Function', text('Unknown')),
@@ -156,7 +186,7 @@ export const onTransaction: OnTransactionHandler = async ({
               ? row('Safety', text(geminiResult.safetyAssessment))
               : row('Safety', text('Not analyzed')),
             geminiResult?.metadata?.recipient &&
-              row('Recipient', text(geminiResult.metadata.recipient)),
+              row('Contract', text(geminiResult.metadata.recipient)),
             geminiResult?.metadata?.amount &&
               row('Amount', text(geminiResult.metadata.amount)),
             geminiResult?.redFlags?.length
@@ -166,17 +196,24 @@ export const onTransaction: OnTransactionHandler = async ({
         } else {
           // we just say we can't decode
           rows = [
-            row('To', text(transactionTo)),
-            row('Verified', text('False')),
-            row('Hedera native token', text(`False`)),
+            row('Contract', text(transactionTo)),
+            row('Contract Verified', text('False'), RowVariant.Critical),
+            row('Hedera Native Token', text(`False`)),
           ];
         }
-        type = decodeData(transaction.data);
+        operation = decodeData(transaction.data);
       }
     }
   } else {
-    // Normal transfer
-    type = 'HBAR Transfer';
+    // Normal transfer. Check if it's an auto account creation
+    if (transactionTo.substring(0, 2) === '0x') {
+      operation = 'HBAR Transfer + Auto Account Creation';
+    } else {
+      operation = 'HBAR Transfer';
+    }
+    rows = [
+      row('Recipient', text(transactionTo)),
+    ]
   }
 
   // Check if the transaction is valid based on user preferences
@@ -197,8 +234,8 @@ export const onTransaction: OnTransactionHandler = async ({
 
   return {
     content: panel([
-      row('Transaction type', text(type)),
-      row('From', text(accountInfo.accountId)),
+      row('Operation', text(operation)),
+      row('Sender', text(senderAccountInfo.accountId)),
       ...rows,
     ]),
   };
@@ -211,18 +248,79 @@ export const onTransaction: OnTransactionHandler = async ({
  * @see https://docs.metamask.io/snaps/reference/exports/#onhomepage
  */
 export const onHomePage: OnHomePageHandler = async () => {
+  // Get the saved values
+  const whiteList = await getValue('whiteList');
+  const banList = await getValue('banList');
+  const warnOver = await getValue('warnOver');
+  const onlyVerifiedSmartContract = await getValue('onlyVerifiedSmartContract');
+  const sourcifyURL = await getValue('sourcifyURL');
+  const mirrorNodeURL = await getValue('mirrorNodeURL');
+  const geminiAPIKey = await getValue('geminiAPIKey');
+
+  // Create the form with the saved values
+  const form = {
+    whiteList: whiteList?.toString() || '',
+    banList: banList?.toString() || '',
+    warnOver: warnOver?.toString() || '999999999',
+    onlyVerifiedSmartContract: onlyVerifiedSmartContract === 'true',
+    sourcifyURL: sourcifyURL?.toString() || '',
+    mirrorNodeURL: mirrorNodeURL?.toString() || '',
+    geminiAPIKey: geminiAPIKey?.toString() || '',
+  };
+  // Create the form with the saved values
+  const formValues = {
+    whiteList: form.whiteList,
+    banList: form.banList,
+    warnOver: form.warnOver,
+    onlyVerifiedSmartContract: form.onlyVerifiedSmartContract,
+    sourcifyURL: form.sourcifyURL,
+    mirrorNodeURL: form.mirrorNodeURL,
+    geminiAPIKey: form.geminiAPIKey,
+  };
+
+  // Create the form
+  const formComponent = (
+    <Form name="preferences" >
+      <Field label="White list. Transactions to contracts in this list will be automatically approved.">
+        <Input name="whiteList" placeholder="Insert comma separated addresses." value={form.whiteList} />
+      </Field>
+      <Field label="Ban list. Transactions to contracts in this list will be automatically denied">
+        <Input name="banList" placeholder="Insert comma separated addresses." value={form.banList} />
+      </Field>
+      <Field label="Warn if the transaction is transferring more than this amount of HBARs.">
+        <Input name="warnOver" type="number" placeholder="Amount in HBAR." value={form.warnOver} />
+      </Field>
+      <Text> </Text>
+      <Checkbox name="onlyVerifiedSmartContract" label="Interact with verified contracts only." checked={form.onlyVerifiedSmartContract} />
+      <Text> </Text>
+      <Heading>External services configuration</Heading>
+      <Text> </Text>
+      <Field label="Sourcify API URL. If not specified, the public Hashscan sourcify server will be used.">
+        <Input name="sourcifyURL" placeholder="Es: https://server-verify.hashscan.io" value={form.sourcifyURL} />
+      </Field>
+      <Field label="Custom Mirror Node API URL. If not specified, the public mirror nodes will be used.">
+        <Input name="mirrorNodeURL" placeholder="Es: https://mainnet.mirrornode.hedera.com/api/v1" value={form.mirrorNodeURL} />
+      </Field>
+      <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
+        <Input name="geminiAPIKey" placeholder="XXX" value={form.geminiAPIKey} />
+      </Field>
+    </Form>
+  );
+  // Create the container
+  const container = (
+    <Container>
+      <Box>
+        <Heading>Welcome to the Hedera Insight Snap configuration.</Heading>
+        <Text>Here you can configure some options to customize your experience.</Text>
+        {formComponent}
+        <Text> </Text>
+        <Button type="submit" form='preferences'>Save preferences</Button>
+      </Box>
+    </Container>
+  );
+  // Return the container
   return {
-    content: (
-      <Container>
-        <Box>
-          <Heading>Hello world!</Heading>
-          <Text>Welcome to my Snap home page!</Text>
-        </Box>
-        <Footer>
-          <Button name="footer_button">Configure preferences</Button>
-        </Footer>
-      </Container>
-    ),
+    content: container,
   };
 };
 
@@ -236,74 +334,37 @@ export const onHomePage: OnHomePageHandler = async () => {
  * @see https://docs.metamask.io/snaps/reference/exports/#onuserinput
  */
 export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
-  // Since this Snap only has one event, we can assert the event type and name
-  // directly.
-  assert(event.type === UserInputEventType.ButtonClickEvent);
-  assert(event.name === 'footer_button');
+  assert(event.type === UserInputEventType.FormSubmitEvent);
 
-  await snap.request({
-    method: 'snap_dialog',
-    params: {
-      type: 'alert',
-      content: (
-        <Box>
-          <Heading>Alert heading</Heading>
-          <Text>Something happened in the system.</Text>
-        </Box>
-      ),
-    },
-  });
+  // Get the form values
+  const formValues = event.value as {
+    whiteList: string;
+    banList: string;
+    warnOver: string;
+    onlyVerifiedSmartContract: boolean;
+    sourcifyURL: string;
+    mirrorNodeURL: string;
+    geminiAPIKey: string;
+  };
+
+  saveValue('whiteList', formValues.whiteList);
+  saveValue('banList', formValues.banList);
+  saveValue('warnOver', formValues.warnOver);
+  saveValue('onlyVerifiedSmartContract', formValues.onlyVerifiedSmartContract.toString());
+  saveValue('sourcifyURL', formValues.sourcifyURL);
+  saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
+  saveValue('geminiAPIKey', formValues.geminiAPIKey);
 
   await snap.request({
     method: 'snap_updateInterface',
     params: {
       id,
       ui: (
-        <Box>
-          <Text>Footer button was pressed</Text>
+        <Box alignment='center'>
+          <Text><Bold>Preferences saved correctly.</Bold></Text>
         </Box>
       ),
     },
   });
-};
 
-/**
- * Handle incoming JSON-RPC requests, sent through `wallet_invokeSnap`.
- *
- * @param args - The request handler args as object.
- * @param args.origin - The origin of the request, e.g., the website that
- * invoked the snap.
- * @param args.request - A validated JSON-RPC request object.
- * @returns The result of `snap_dialog`.
- * @throws If the request method is not valid for this snap.
- */
-export const onRpcRequest: OnRpcRequestHandler = async ({
-  origin,
-  request,
-}) => {
-  switch (request.method) {
-    case 'hello':
-      return snap.request({
-        method: 'snap_dialog',
-        params: {
-          type: 'confirmation',
-          content: (
-            <Box>
-              <Text>
-                Hello, <Bold>{origin}</Bold>!
-              </Text>
-              <Text>
-                This custom confirmation is just for display purposes.
-              </Text>
-              <Text>
-                But you can edit the snap source code to make it do something,
-                if you want to!
-              </Text>
-            </Box>
-          ),
-        },
-      });
-    default:
-      throw new Error('Method not found.');
-  }
 };
