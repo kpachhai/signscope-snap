@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@metamask/providers": "^22.1.0",
+    "ethers": "^6.13.7",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-is": "^18.2.0",

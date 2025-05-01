@@ -1,3 +1,7 @@
+/* eslint-disable no-alert */
+/* eslint-disable @typescript-eslint/no-use-before-define */
+import { ethers } from 'ethers';
+import { useState } from 'react';
 import styled from 'styled-components';
 
 import {
@@ -190,6 +194,9 @@ const Index = () => {
             !shouldDisplayReconnectButton(installedSnap)
           }
         />
+
+        <TransferTokenComponent />
+
         <Notice>
           <p>
             Please note that the <b>snap.manifest.json</b> and{' '}
@@ -200,6 +207,81 @@ const Index = () => {
         </Notice>
       </CardContainer>
     </Container>
+  );
+};
+
+const TransferTokenContainer = styled.div`
+  margin-top: 2rem;
+  padding: 2rem;
+  border: 1px solid ${({ theme }) => theme.colors.border?.default};
+  border-radius: ${({ theme }) => theme.radii.default};
+  max-width: 60rem;
+  width: 100%;
+`;
+
+const Input = styled.input`
+  width: 100%;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+`;
+
+const TransferTokenComponent = () => {
+  const [contractAddress, setContractAddress] = useState('');
+  const [toAddress, setToAddress] = useState('');
+  const [amount, setAmount] = useState('');
+
+  const handleTransfer = async () => {
+    if (!(window as any).ethereum) {
+      alert('MetaMask is not available');
+      return;
+    }
+
+    try {
+      const provider = new ethers.providers.Web3Provider(
+        (window as any).ethereum,
+      );
+      const signer = provider.getSigner();
+
+      const erc20Abi = [
+        'function transfer(address to, uint256 amount) public returns (bool)',
+        'function decimals() public view returns (uint8)',
+      ];
+      const contract = new ethers.Contract(contractAddress, erc20Abi, signer);
+
+      const decimals = await contract.decimals();
+      const parsedAmount = ethers.utils.parseUnits(amount, decimals);
+
+      const tx = await contract.transfer(toAddress, parsedAmount);
+      await tx.wait();
+
+      alert(`Transaction sent! Hash: ${tx.hash}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <TransferTokenContainer>
+      <h3>Transfer ERC-20 Token</h3>
+      <Input
+        placeholder="ERC-20 Contract Address"
+        value={contractAddress}
+        onChange={(element) => setContractAddress(element.target.value)}
+      />
+      <Input
+        placeholder="Recipient Address"
+        value={toAddress}
+        onChange={(element) => setToAddress(element.target.value)}
+      />
+      <Input
+        placeholder="Amount"
+        value={amount}
+        onChange={(element) => setAmount(element.target.value)}
+      />
+      <SendHelloButton onClick={handleTransfer}>Transfer Token</SendHelloButton>
+    </TransferTokenContainer>
   );
 };
 
