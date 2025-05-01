@@ -7,7 +7,7 @@
     "url": "https://github.com/kpachhai/signscope-snap.git"
   },
   "source": {
-    "shasum": "WOrGekyEGjo7qsytJAm5stNtXEJ3kJ1QFrpDFis+s14=",
+    "shasum": "r+J1q+lLiTaXtcRh3/fJlwkirjt1jQwJLe+KB7dbO+0=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",
@@ -27,6 +27,6 @@
     "endowment:page-home": {},
     "endowment:network-access": {}
   },
-  "platformVersion": "6.18.0",
+  "platformVersion": "6.22.1",
   "manifestVersion": "0.1"
 }
