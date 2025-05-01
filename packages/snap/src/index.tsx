@@ -5,8 +5,6 @@ import { SeverityLevel, panel, text, row, address } from '@metamask/snaps-sdk';
 import { hasProperty } from '@metamask/utils';
 import { ethers } from 'ethers';
 
-import { decodeData } from './utils';
-
 const erc20Abi = [
   'function name() view returns (string)',
   'function symbol() view returns (string)',
@@ -52,21 +50,14 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
   ) {
-    const type = decodeData(transaction.data);
-    console.log(transaction);
     const iface = new ethers.Interface(erc20Abi);
     const decodedData = iface.parseTransaction({ data: transaction.data });
     const isHTSToken = isHTS(transaction.to).toString();
-    let functionName = 'null';
+    let args = 'null';
+    let signature = 'null';
     if (decodedData) {
-      console.log('Decoded function call:');
-      console.log('Function name:', decodedData.name);
-      console.log('Arguments:', decodedData.args);
-      console.log(
-        'Value (ETH sent with the call):',
-        decodedData.value.toString(),
-      );
-      functionName = decodedData.name;
+      args = decodedData.args.toString();
+      signature = decodedData.signature;
     } else {
       console.log('Could not decode the transaction data as a function call.');
     }
@@ -80,7 +71,8 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
             ? address(transaction.to as `0x${string}`)
             : text('None'),
         ),
-        row('Function name', text(functionName)),
+        row('Signature', text(signature)),
+        row('Arguments', text(args)),
         row('Hedera native token', text(isHTSToken)),
       ]),
       severity: SeverityLevel.Critical,
