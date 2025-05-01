@@ -9,7 +9,6 @@ import type {
   OnUserInputHandler,
 } from '@metamask/snaps-sdk';
 import {
-  SeverityLevel,
   panel,
   text,
   row,
@@ -27,7 +26,6 @@ import {
   Checkbox,
   Button,
   Form,
-  Row,
 } from '@metamask/snaps-sdk/jsx';
 import { assert } from '@metamask/utils';
 
@@ -371,7 +369,10 @@ export const onTransaction: OnTransactionHandler = async ({
   }
 
   // Check if the transaction is valid based on user preferences
-  const validationResult = await validateTransaction(transaction, transactionTo);
+  const validationResult = await validateTransaction(
+    transaction,
+    transactionTo,
+  );
 
   if (validationResult.shouldBeBlocked()) {
     // Handle blocking issues
@@ -379,20 +380,23 @@ export const onTransaction: OnTransactionHandler = async ({
     console.log('Blocking issues:', blockingIssues);
     return {
       content: panel([
-        row('Blocking issues:',  text(blockingIssues.join(', ')), RowVariant.Critical),
+        row(
+          'Blocking issues:',
+          text(blockingIssues.join(', ')),
+          RowVariant.Critical,
+        ),
         row('Operation', text(operation)),
         row('Sender', text(senderAccountInfo.accountId)),
         ...rows,
       ]),
     };
-
   } else if (validationResult.containsWarnings()) {
     // Handle warnings
     const warningList = validationResult.getWarnings();
     console.log('Warnings:', warningList);
     return {
       content: panel([
-        row('Warnings:',  text(warningList.join(', ')), RowVariant.Warning),
+        row('Warnings:', text(warningList.join(', ')), RowVariant.Warning),
         row('Operation', text(operation)),
         row('Sender', text(senderAccountInfo.accountId)),
         ...rows,
@@ -482,14 +486,14 @@ export const onHomePage: OnHomePageHandler = async () => {
       <Field label="Custom Mirror Node API URL. If not specified, the public mirror nodes will be used.">
         <Input
           name="mirrorNodeURL"
-          placeholder="Es: https://mainnet.mirrornode.hedera.com/api/v1"
+          placeholder="Es: https://testnet.mirrornode.hedera.com/api/v1"
           value={form.mirrorNodeURL as string}
         />
       </Field>
       <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
         <Input
           name="geminiAPIKey"
-          type='password'
+          type="password"
           value={form.geminiAPIKey as string}
         />
       </Field>
