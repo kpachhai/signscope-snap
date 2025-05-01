@@ -30,7 +30,11 @@ import {
 } from '@metamask/snaps-sdk/jsx';
 import { assert } from '@metamask/utils';
 
-import { getGeminiDecodedInsight, type GeminiResult } from './llm';
+import {
+  generateHTSTokenSummary,
+  getGeminiDecodedInsight,
+  type GeminiResult,
+} from './llm';
 import type { AccountInfo } from './types/account';
 import { decodeData, saveValue, getValue, extractChainId } from './utils';
 import type { FetchResponse } from './utils/FetchUtils';
@@ -161,13 +165,26 @@ export const onTransaction: OnTransactionHandler = async ({
         abi = erc20Abi;
         const { signature, args } = decodeTransaction(abi, transaction.data);
 
+        const match = signature.match(/^(\w+)\s*\(/u);
+        operation = match ? match[1] : 'N/A';
+
+        const contractId = `0.0.${BigInt(transactionTo).toString()}`;
+
         rows = [
-          row('Contract', text(transactionTo)),
+          row('Contract', text(contractId)),
           row('Signature', text(signature)),
           row('Arguments', text(args)),
           row('Contract Verified', text('True')),
           row('Hedera Native Token', text(`True`)),
         ];
+        const tokenMetadata = await FetchUtils.fetchDataFromUrl(
+          `https://testnet.mirrornode.hedera.com/api/v1/tokens/${contractId}`,
+        );
+
+        if (tokenMetadata.success && tokenMetadata.data) {
+          const summary = generateHTSTokenSummary(tokenMetadata.data);
+          rows.push(row('HTS Token Info', text(summary)));
+        }
       } else {
         const sourcifyURL =
           (await getValue('sourcifyURL')) ||

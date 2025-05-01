@@ -124,3 +124,18 @@ export async function getGeminiDecodedInsight(
 
   return null;
 }
+
+export function generateHTSTokenSummary(metadata: Record<string, any>): string {
+  const tokenId = metadata.token_id || 'N/A';
+  const symbol = metadata.symbol || 'N/A';
+  const name = metadata.name || 'Unnamed Token';
+  const type = (metadata.type || 'UNKNOWN').replace(/_/gu, ' ').toLowerCase();
+  const totalSupply = metadata.total_supply || '0';
+  const decimals = metadata.decimals || '0';
+  const supplyType = (metadata.supply_type || 'UNKNOWN').toLowerCase();
+  const paused = metadata.pause_status !== 'NOT_APPLICABLE';
+
+  return `Token \`${symbol}\` (${tokenId}) is a Hedera HTS ${type} token named "${name}".
+It has an initial and total supply of ${totalSupply} with ${decimals} decimal places.
+The token has an ${supplyType} supply and is currently ${paused ? 'paused' : 'active'}.`;
+}
