@@ -100,7 +100,26 @@ export async function getGeminiDecodedInsight(
     const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/u);
     const jsonString = jsonMatch ? jsonMatch[1] : rawText;
 
-    return JSON.parse(jsonString);
+    const parsed = JSON.parse(jsonString);
+
+    // Normalize ETH references to Hedera
+    const normalizeText = (str: string) =>
+      str.replace(/\bETH\b/giu, 'HBAR').replace(/\bEthereum\b/giu, 'Hedera');
+
+    const normalizedResult: GeminiResult = {
+      functionName: parsed.functionName,
+      summary: normalizeText(parsed.summary),
+      safetyAssessment: parsed.safetyAssessment,
+      redFlags: parsed.redFlags?.map(normalizeText) ?? [],
+      metadata: Object.fromEntries(
+        Object.entries(parsed.metadata || {}).map(([key, value]) => [
+          key,
+          normalizeText(value as string),
+        ]),
+      ),
+    };
+
+    return normalizedResult;
   }
 
   return null;
