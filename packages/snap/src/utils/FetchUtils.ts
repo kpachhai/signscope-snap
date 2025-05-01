@@ -35,3 +35,19 @@ export class FetchUtils {
     };
   }
 }
+
+export async function fetchABI(contractAddres: string) {
+  try {
+    const response = await fetch(
+      `https://server-verify.hashscan.io/files/any/296/${contractAddres}`,
+    );
+    console.log('Response:', response);
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+    const data = await response.json();
+    return data.files[0].content;
+  } catch (error) {
+    console.error('Fetch error:', error);
+  }
+}

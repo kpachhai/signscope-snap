@@ -11,6 +11,7 @@ import type {
   Token,
   TokenBalance,
 } from '../types/account';
+import { ethers } from 'ethers';
 
 export class HederaUtils {
   public static timestampToString(
@@ -179,4 +180,29 @@ export class HederaUtils {
 
     return result;
   }
+}
+
+export function isHTS(inputString: string) {
+  return inputString?.startsWith('0x00000000000');
+}
+
+export function decodeTransaction(
+  abi: string[],
+  transactionData: string,
+): { signature: any; args: any } {
+  // everything happens in here - assumes the abi is ok....
+  const iface = new ethers.Interface(abi);
+  const decodedData = iface.parseTransaction({
+    data: transactionData,
+  });
+
+  let args = 'null';
+  let signature = 'null';
+  if (decodedData) {
+    args = decodedData.args.toString();
+    signature = decodedData.signature;
+  } else {
+    console.log('Could not decode the transaction data as a function call.');
+  }
+  return { signature, args };
 }

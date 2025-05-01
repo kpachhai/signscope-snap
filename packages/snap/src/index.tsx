@@ -21,12 +21,12 @@ import {
   Footer,
   Button,
 } from '@metamask/snaps-sdk/jsx';
-import { assert, hasProperty } from '@metamask/utils';
+import { assert, hasProperty, Transaction } from '@metamask/utils';
 import { ethers } from 'ethers';
 
 import type { AccountInfo } from './types/account';
 import { decodeData } from './utils';
-import { HederaUtils } from './utils/HederaUtils';
+import { decodeTransaction, HederaUtils, isHTS } from './utils/HederaUtils';
 import { validateTransaction } from './validation';
 import { FetchResponse, FetchUtils } from './utils/FetchUtils';
 
@@ -46,34 +46,6 @@ const erc20Abi = [
   'function increaseAllowance(address spender, uint256 addedValue) public returns (bool)',
   'event Approval(address indexed owner, address indexed spender, uint256 value)',
 ];
-
-/**
- *
- * @param inputString
- */
-function isHTS(inputString: string) {
-  return inputString?.startsWith('0x00000000000');
-}
-
-/**
- *
- * @param contractAddres
- */
-async function fetchABI(contractAddres: string) {
-  try {
-    const response = await fetch(
-      `https://server-verify.hashscan.io/files/any/296/${contractAddres}`,
-    );
-    console.log('Response:', response);
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
-    }
-    const data = await response.json();
-    return data.files[0].content;
-  } catch (error) {
-    console.error('Fetch error:', error);
-  }
-}
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
@@ -143,55 +115,57 @@ export const onTransaction: OnTransactionHandler = async ({
     accountInfo.accountId = 'N/A';
   }
 
-  console.log('Account info:', accountInfo);
-
   let type = 'N/A';
   let rows: any[] = [];
 
-  if (
-    hasProperty(transaction, 'data') &&
-    typeof transaction.data === 'string'
-  ) {
+  if (transaction?.data !== '0x') {
     const isContractCreate =
       transaction.to === null || transaction.to === undefined;
     // do the ABI retrieval
     if (!isContractCreate) {
       const isHTSToken = isHTS(transaction.to);
-      let abi;
+      let abi = [];
       if (isHTSToken) {
         abi = erc20Abi;
+        const { signature, args } = decodeTransaction(abi, transaction.data);
+
+        rows = [
+          row('To', text(transactionTo)),
+          row('Signature', text(signature)),
+          row('Arguments', text(args)),
+          row('Verified', text('True')),
+          row('Hedera native token', text(`${isHTSToken}`)),
+        ];
       } else {
         const response: FetchResponse = await FetchUtils.fetchDataFromUrl(
           `https://server-verify.hashscan.io/files/any/296/${transaction.to}`,
         );
+
         if (response.success) {
-          abi = response.data.files[0].content.output.abi;
+          abi = JSON.parse(response?.data?.files[0]?.content)?.output.abi;
+
+          const { signature, args } = decodeTransaction(abi, transaction.data);
+
+          rows = [
+            row('To', text(transactionTo)),
+            row('Signature', text(signature)),
+            row('Arguments', text(args)),
+            row('Verified', text('True')),
+            row('Hedera native token', text(`${isHTSToken}`)),
+          ];
+        } else {
+          // we just say we can't decode
+          rows = [
+            row('To', text(transactionTo)),
+            row('Verified', text('False')),
+            row('Hedera native token', text(`${isHTSToken}`)),
+          ];
         }
+        type = decodeData(transaction.data);
       }
-
-      const iface = new ethers.Interface(abi);
-      const decodedData = iface.parseTransaction({ data: transaction.data });
-
-      let args = 'null';
-      let signature = 'null';
-      if (decodedData) {
-        args = decodedData.args.toString();
-        signature = decodedData.signature;
-      } else {
-        console.log(
-          'Could not decode the transaction data as a function call.',
-        );
-      }
-
-      rows = [
-        row('To', text(transactionTo)),
-        row('Signature', text(signature)),
-        row('Arguments', text(args)),
-        row('Hedera native token', text(`${isHTSToken}`)),
-      ];
+    } else {
+      type = 'Contract Create';
     }
-    // Smart contract dedicated functions
-    type = decodeData(transaction.data);
   } else {
     // Normal transfer
     type = 'HBAR Transfer';
