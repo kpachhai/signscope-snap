@@ -11,6 +11,10 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "strict": true,
-    "target": "es2020"
+    "target": "es2020",
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "incremental": true,
+    "pretty": true
   }
 }

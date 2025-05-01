@@ -22,9 +22,25 @@ import {
 } from '@metamask/snaps-sdk/jsx';
 import { assert, hasProperty } from '@metamask/utils';
 
+import { getGeminiDecodedInsight, type GeminiResult } from './llm';
 import type { AccountInfo } from './types/account';
 import { decodeData } from './utils';
 import { HederaUtils } from './utils/HederaUtils';
+
+const ERC20_ABI = [
+  {
+    constant: false,
+    inputs: [
+      { name: '_to', type: 'address' },
+      { name: '_value', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', type: 'bool' }],
+    payable: false,
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+];
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
@@ -51,7 +67,6 @@ export const onTransaction: OnTransactionHandler = async ({
   transaction,
   chainId,
 }) => {
-  // Check if it's a valid hedera network
   if (
     chainId !== 'eip155:295' && // Mainnet
     chainId !== 'eip155:296' && // Testnet
@@ -61,9 +76,7 @@ export const onTransaction: OnTransactionHandler = async ({
       content: panel([
         row(
           'Network Error',
-          text(
-            'Please connect to Hedera Mainnet|Testnet|Previewnet to enable the insight',
-          ),
+          text('Please connect to Hedera Mainnet|Testnet|Previewnet'),
         ),
       ]),
     };
@@ -73,12 +86,12 @@ export const onTransaction: OnTransactionHandler = async ({
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
   ) {
-    // Check if it's a valid hedera accountId
     const transactionFrom = transaction.from as `0x${string}`;
     const accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
       transactionFrom,
       'https://testnet.mirrornode.hedera.com',
     );
+
     if (!accountInfo) {
       return {
         content: panel([
@@ -93,18 +106,43 @@ export const onTransaction: OnTransactionHandler = async ({
     const transactionTo = transaction.to
       ? (transaction.to as `0x${string}`)
       : 'N/A';
-    const type = decodeData(transaction.data);
+    const decodedLabel = decodeData(transaction.data);
+    const geminiResult: GeminiResult | null = await getGeminiDecodedInsight(
+      ERC20_ABI,
+      transaction.data,
+    );
+
     return {
-      content: panel([
-        row('From', text(accountInfo.accountId)),
-        row('To', text(transactionTo)),
-        row('Transaction type', text(type)),
-      ]),
+      content: panel(
+        [
+          row('From', text(accountInfo.accountId)),
+          row('Contract', text(transactionTo)),
+          row('Transaction Type', text(decodedLabel)),
+          geminiResult
+            ? row('Function', text(geminiResult.functionName))
+            : row('Function', text('Unknown')),
+          geminiResult
+            ? row('Summary', text(geminiResult.summary))
+            : row('Summary', text('No insight available')),
+          geminiResult
+            ? row('Safety', text(geminiResult.safetyAssessment))
+            : row('Safety', text('Not analyzed')),
+          geminiResult?.metadata?.recipient &&
+            row('Recipient', text(geminiResult.metadata.recipient)),
+          geminiResult?.metadata?.amount &&
+            row('Amount', text(geminiResult.metadata.amount)),
+          geminiResult?.redFlags?.length
+            ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
+            : row('Red Flags', text('None')),
+        ].filter(Boolean) as any[],
+      ),
       severity: SeverityLevel.Critical,
     };
   }
 
-  return { content: panel([row('Transaction type', text('Unknown'))]) };
+  return {
+    content: panel([row('Transaction type', text('Unknown'))]),
+  };
 };
 
 /**

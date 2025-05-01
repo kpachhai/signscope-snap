@@ -2,6 +2,10 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "baseUrl": "./",
+    "declaration": true,
+    "inlineSourceMap": true,
+    "incremental": false,
+    "removeComments": true,
     "jsx": "react-jsx",
     "jsxImportSource": "@metamask/snaps-sdk"
   },
