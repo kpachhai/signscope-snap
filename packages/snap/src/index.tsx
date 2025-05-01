@@ -1,11 +1,12 @@
-import type { OnRpcRequestHandler } from '@metamask/snaps-sdk';
-import { Box, Text, Bold } from '@metamask/snaps-sdk/jsx';
-import type { OnTransactionHandler } from '@metamask/snaps-sdk';
+import type {
+  OnRpcRequestHandler,
+  OnTransactionHandler,
+} from '@metamask/snaps-sdk';
 import { SeverityLevel, panel, text, row, address } from '@metamask/snaps-sdk';
+import { Box, Text, Bold } from '@metamask/snaps-sdk/jsx';
 import { hasProperty } from '@metamask/utils';
 
 import { decodeData } from './utils';
-
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`

@@ -22,7 +22,8 @@
       "dapps": true,
       "snaps": false
     },
-    "endowment:transaction-insight": {}
+    "endowment:transaction-insight": {},
+    "endowment:page-home": {}
   },
   "platformVersion": "6.18.0",
   "manifestVersion": "0.1"
