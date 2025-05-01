@@ -1,3 +1,7 @@
+/* eslint-disable no-nested-ternary */
+/* eslint-disable no-negated-condition */
+/* eslint-disable jsdoc/require-jsdoc */
+/* eslint-disable @typescript-eslint/no-floating-promises */
 /* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 import type {
   OnHomePageHandler,
@@ -207,30 +211,126 @@ export const onTransaction: OnTransactionHandler = async ({
                 sourceCode,
               );
 
-            rows = [
-              ...rows,
-              geminiResult
-                ? row('Function', text(geminiResult.functionName))
-                : row('Function', text('Not analyzed')),
-              geminiResult
-                ? row('Summary', text(geminiResult.summary))
-                : row('Summary', text('No insight available')),
-              geminiResult
-                ? row('Safety', text(geminiResult.safetyAssessment))
-                : row('Safety', text('Not analyzed')),
-              geminiResult?.metadata?.recipient &&
-                row('Contract', text(geminiResult.metadata.recipient)),
-              geminiResult?.metadata?.amount &&
-                row('Amount', text(geminiResult.metadata.amount)),
-              geminiResult?.redFlags?.length
-                ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
-                : row('Red Flags', text('Not analyzed')),
-            ].filter(Boolean);
+            if (geminiResult) {
+              const summaryText = geminiResult.summary?.toLowerCase() || '';
+              const redFlagsText =
+                geminiResult.redFlags?.join(' ')?.toLowerCase() || '';
+
+              const { signature: actualSignature } = decodeTransaction(
+                abi,
+                transaction.data,
+              );
+
+              function normalizeFnName(fn: string): string {
+                return fn
+                  .toLowerCase()
+                  .replace(/\(.*\)/u, '')
+                  .trim();
+              }
+
+              const normalizedGeminiFn = normalizeFnName(
+                geminiResult.functionName || '',
+              );
+              const normalizedActualFn = normalizeFnName(actualSignature || '');
+              const isFunctionMatch = normalizedGeminiFn === normalizedActualFn;
+
+              // Assess severity based on keywords
+              let effectiveAssessment = geminiResult.safetyAssessment;
+              const containsCriticalFlags =
+                redFlagsText.includes('reentrancy') ||
+                redFlagsText.includes('overflow') ||
+                redFlagsText.includes('vulnerability') ||
+                summaryText.includes('vulnerable') ||
+                summaryText.includes('can be exploited');
+
+              const hasPayloadSpecificRisk =
+                containsCriticalFlags ||
+                summaryText.includes('this transaction') ||
+                summaryText.includes('provided arguments') ||
+                redFlagsText.includes('this transaction');
+
+              if (containsCriticalFlags && isFunctionMatch) {
+                effectiveAssessment = 'dangerous';
+              }
+
+              const insightRows = [
+                row('🔍 AI Security Insight', text('')),
+
+                !isFunctionMatch
+                  ? row(
+                      '⚠️ AI Analysis Warning',
+                      text(
+                        `Gemini analyzed "${geminiResult.functionName}", but this transaction is calling "${actualSignature}". Results may refer to a different function.`,
+                      ),
+                      RowVariant.Warning,
+                    )
+                  : null,
+
+                row('Function', text(geminiResult.functionName || 'Unknown')),
+                row('Summary', text(geminiResult.summary || 'No summary')),
+
+                row(
+                  'Safety',
+                  text(
+                    effectiveAssessment === 'dangerous'
+                      ? '❌ Dangerous'
+                      : effectiveAssessment === 'suspicious'
+                        ? '⚠️ Suspicious'
+                        : '✅ Safe',
+                  ),
+                  effectiveAssessment === 'dangerous'
+                    ? RowVariant.Critical
+                    : effectiveAssessment === 'suspicious'
+                      ? RowVariant.Warning
+                      : RowVariant.Default,
+                ),
+
+                row(
+                  'Current Call Risk',
+                  text(
+                    hasPayloadSpecificRisk && isFunctionMatch
+                      ? effectiveAssessment === 'dangerous'
+                        ? '❌ This specific transaction appears dangerous based on how the arguments interact with the function.'
+                        : '⚠️ This transaction may be suspicious depending on runtime behavior.'
+                      : '✅ No direct vulnerability detected in this transaction.',
+                  ),
+                  hasPayloadSpecificRisk && isFunctionMatch
+                    ? effectiveAssessment === 'dangerous'
+                      ? RowVariant.Critical
+                      : RowVariant.Warning
+                    : RowVariant.Default,
+                ),
+
+                geminiResult.metadata?.recipient
+                  ? row(
+                      'Inferred Recipient',
+                      text(geminiResult.metadata.recipient),
+                    )
+                  : null,
+
+                geminiResult.metadata?.amount
+                  ? row('Inferred Amount', text(geminiResult.metadata.amount))
+                  : null,
+
+                row(
+                  'Red Flags',
+                  text(
+                    geminiResult.redFlags.length
+                      ? geminiResult.redFlags.join('\n\n')
+                      : 'None',
+                  ),
+                  geminiResult.redFlags.length
+                    ? RowVariant.Warning
+                    : RowVariant.Default,
+                ),
+              ].filter(Boolean); // remove nulls
+
+              rows.push(...insightRows);
+            } else {
+              rows.push(row('AI Insight', text('No insight generated.')));
+            }
           } else {
-            rows = [
-              ...rows,
-              row('LLM', text('Not configured to generate insights')),
-            ];
+            rows.push(row('AI Insight', text('LLM not configured.')));
           }
         } else {
           rows = [
