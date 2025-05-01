@@ -172,10 +172,9 @@ export const onTransaction: OnTransactionHandler = async ({
         const contractId = `0.0.${BigInt(transactionTo).toString()}`;
 
         rows = [
-          row('Contract', text(contractId)),
+          row('Token ID', text(contractId)),
           row('Signature', text(signature)),
           row('Arguments', text(args)),
-          row('Contract Verified', text('True')),
           row('Hedera Native Token', text(`True`)),
         ];
         const tokenMetadata = await FetchUtils.fetchDataFromUrl(
