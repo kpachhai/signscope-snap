@@ -5,6 +5,14 @@ import type {
   OnUserInputHandler,
 } from '@metamask/snaps-sdk';
 import {
+  SeverityLevel,
+  panel,
+  text,
+  row,
+  address,
+  UserInputEventType,
+} from '@metamask/snaps-sdk';
+import {
   Box,
   Text,
   Bold,
@@ -13,20 +21,14 @@ import {
   Footer,
   Button,
 } from '@metamask/snaps-sdk/jsx';
-import {
-  SeverityLevel,
-  panel,
-  text,
-  row,
-  address,
-  UserInputEventType,
-} from '@metamask/snaps-sdk';
 import { assert, hasProperty } from '@metamask/utils';
 import { ethers } from 'ethers';
-import { AccountInfo } from './types/account';
+
+import type { AccountInfo } from './types/account';
+import { decodeData } from './utils';
 import { HederaUtils } from './utils/HederaUtils';
 import { validateTransaction } from './validation';
-import { decodeData } from './utils';
+import { FetchResponse, FetchUtils } from './utils/FetchUtils';
 
 const erc20Abi = [
   'function name() view returns (string)',
@@ -45,16 +47,27 @@ const erc20Abi = [
   'event Approval(address indexed owner, address indexed spender, uint256 value)',
 ];
 
+/**
+ *
+ * @param inputString
+ */
 function isHTS(inputString: string) {
-  return inputString.startsWith('0x00000000000');
+  return inputString?.startsWith('0x00000000000');
 }
 
+/**
+ *
+ * @param contractAddres
+ */
 async function fetchABI(contractAddres: string) {
   try {
     const response = await fetch(
-      'https://server-verify.hashscan.io/files/any/296/' + contractAddres,
+      `https://server-verify.hashscan.io/files/any/296/${contractAddres}`,
     );
-    if (!response.ok) throw new Error('Network response was not ok');
+    console.log('Response:', response);
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
     const data = await response.json();
     return data.files[0].content;
   } catch (error) {
@@ -109,10 +122,10 @@ export const onTransaction: OnTransactionHandler = async ({
   const validationResult = validateTransaction(transaction);
   if (validationResult.shouldBeBlocked()) {
     // Handle blocking issues
-    let blockingIssues = validationResult.getBlockingIssues();
+    const blockingIssues = validationResult.getBlockingIssues();
   } else if (validationResult.containsWarnings()) {
     // Handle warnings
-    let warningList = validationResult.getWarnings();
+    const warningList = validationResult.getWarnings();
   }
 
   const transactionFrom = transaction.from as `0x${string}`;
@@ -133,45 +146,50 @@ export const onTransaction: OnTransactionHandler = async ({
   console.log('Account info:', accountInfo);
 
   let type = 'N/A';
+  let rows: any[] = [];
+
   if (
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
   ) {
-    const isHTSToken = isHTS(transaction.to);
+    const isContractCreate =
+      transaction.to === null || transaction.to === undefined;
+    // do the ABI retrieval
+    if (!isContractCreate) {
+      const isHTSToken = isHTS(transaction.to);
+      let abi;
+      if (isHTSToken) {
+        abi = erc20Abi;
+      } else {
+        const response: FetchResponse = await FetchUtils.fetchDataFromUrl(
+          `https://server-verify.hashscan.io/files/any/296/${transaction.to}`,
+        );
+        if (response.success) {
+          abi = response.data.files[0].content.output.abi;
+        }
+      }
 
-    let abi;
-    if (isHTSToken) {
-      abi = erc20Abi;
-    } else {
-      abi = await JSON.parse(await fetchABI(transaction.to)).output.abi;
-    }
-    const iface = new ethers.Interface(abi);
-    const decodedData = iface.parseTransaction({ data: transaction.data });
+      const iface = new ethers.Interface(abi);
+      const decodedData = iface.parseTransaction({ data: transaction.data });
 
-    let args = 'null';
-    let signature = 'null';
-    if (decodedData) {
-      args = decodedData.args.toString();
-      signature = decodedData.signature;
-    } else {
-      console.log('Could not decode the transaction data as a function call.');
-    }
+      let args = 'null';
+      let signature = 'null';
+      if (decodedData) {
+        args = decodedData.args.toString();
+        signature = decodedData.signature;
+      } else {
+        console.log(
+          'Could not decode the transaction data as a function call.',
+        );
+      }
 
-    return {
-      content: panel([
-        row('From', address(transaction.from as `0x${string}`)),
-        row(
-          'To',
-          transaction.to
-            ? address(transaction.to as `0x${string}`)
-            : text('None'),
-        ),
+      rows = [
+        row('To', text(transactionTo)),
         row('Signature', text(signature)),
         row('Arguments', text(args)),
         row('Hedera native token', text(`${isHTSToken}`)),
-      ]),
-      severity: SeverityLevel.Critical,
-    };
+      ];
+    }
     // Smart contract dedicated functions
     type = decodeData(transaction.data);
   } else {
@@ -182,8 +200,8 @@ export const onTransaction: OnTransactionHandler = async ({
   return {
     content: panel([
       row('From (Account Id)', text(accountInfo.accountId)),
-      row('To', text(transactionTo)),
       row('Transaction type', text(type)),
+      ...rows,
     ]),
     severity: SeverityLevel.Critical,
   };
