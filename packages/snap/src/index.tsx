@@ -472,7 +472,7 @@ export const onHomePage: OnHomePageHandler = async () => {
       <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
         <Input
           name="geminiAPIKey"
-          placeholder="XXX"
+          type='password'
           value={form.geminiAPIKey as string}
         />
       </Field>
