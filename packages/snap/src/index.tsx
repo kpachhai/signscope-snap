@@ -130,7 +130,7 @@ export const onTransaction: OnTransactionHandler = async ({
 
   console.log('Transaction to:', transactionTo);
 
-  let type = 'N/A';
+  let operation = 'N/A';
   let rows: any[] = [];
 
   if (transaction.data && transaction.data !== '0x') {
@@ -141,7 +141,7 @@ export const onTransaction: OnTransactionHandler = async ({
       transaction.to === null || transaction.to === undefined;
     // do the ABI retrieval
     if (isContractCreate) {
-      type = 'Contract Create';
+      operation = 'Create Contract';
     } else {
       const isHTSToken = isHTS(transaction.to);
       let abi = [];
@@ -150,11 +150,11 @@ export const onTransaction: OnTransactionHandler = async ({
         const { signature, args } = decodeTransaction(abi, transaction.data);
 
         rows = [
-          row('To', text(transactionTo)),
+          row('Contract', text(transactionTo)),
           row('Signature', text(signature)),
           row('Arguments', text(args)),
-          row('Verified', text('True')),
-          row('Hedera native token', text(`True`)),
+          row('Contract Verified', text('True')),
+          row('Hedera Native Token', text(`True`)),
         ];
       } else {
         let sourcifyURL = await getValue('sourcifyURL') || 'https://server-verify.hashscan.io';
@@ -170,11 +170,11 @@ export const onTransaction: OnTransactionHandler = async ({
           const geminiResult: GeminiResult | null = await getGeminiDecodedInsight(abi, transaction.data, (await getValue('geminiAPIKey'))?.toString() || '');
 
           rows = [
-            row('To', text(transactionTo)),
+            row('Contract', text(transactionTo)),
             row('Signature', text(signature)),
             row('Arguments', text(args)),
-            row('Verified', text('True')),
-            row('Hedera native token', text(`False`)),
+            row('Contract Verified', text('True')),
+            row('Hedera Native Token', text(`False`)),
             geminiResult
               ? row('Function', text(geminiResult.functionName))
               : row('Function', text('Unknown')),
@@ -185,7 +185,7 @@ export const onTransaction: OnTransactionHandler = async ({
               ? row('Safety', text(geminiResult.safetyAssessment))
               : row('Safety', text('Not analyzed')),
             geminiResult?.metadata?.recipient &&
-              row('Recipient', text(geminiResult.metadata.recipient)),
+              row('Contract', text(geminiResult.metadata.recipient)),
             geminiResult?.metadata?.amount &&
               row('Amount', text(geminiResult.metadata.amount)),
             geminiResult?.redFlags?.length
@@ -195,20 +195,24 @@ export const onTransaction: OnTransactionHandler = async ({
         } else {
           // we just say we can't decode
           rows = [
-            row('To', text(transactionTo)),
-            row('Verified', text('False')),
-            row('Hedera native token', text(`False`)),
+            row('Contract', text(transactionTo)),
+            row('Contract Verified', text('False')),
+            row('Hedera Native Token', text(`False`)),
           ];
         }
-        type = decodeData(transaction.data);
+        operation = decodeData(transaction.data);
       }
     }
   } else {
-    // Normal transfer
+    // Normal transfer. Check if it's an auto account creation
+    if (transactionTo.substring(0, 2) === '0x') {
+      operation = 'HBAR Transfer + Auto Account Creation';
+    } else {
+      operation = 'HBAR Transfer';
+    }
     rows = [
       row('To', text(transactionTo)),
     ]
-    type = 'HBAR Transfer';
   }
 
   // Check if the transaction is valid based on user preferences
@@ -229,8 +233,8 @@ export const onTransaction: OnTransactionHandler = async ({
 
   return {
     content: panel([
-      row('Transaction type', text(type)),
-      row('From', text(senderAccountInfo.accountId)),
+      row('Operation', text(operation)),
+      row('Sender', text(senderAccountInfo.accountId)),
       ...rows,
     ]),
   };
