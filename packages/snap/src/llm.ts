@@ -1,6 +1,9 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import { remove0x } from '@metamask/utils';
 
+import type { FetchResponse } from './utils/FetchUtils';
+import { FetchUtils } from './utils/FetchUtils';
+
 export type GeminiResult = {
   functionName: string;
   summary: string;
@@ -9,7 +12,7 @@ export type GeminiResult = {
   metadata: Record<string, string>;
 };
 
-const GEMINI_API_KEY = 'YOUR_API_KEY_HERE'; // Replace securely
+const GEMINI_API_KEY = 'YOUR_API_KEY'; // Replace securely
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function getGeminiDecodedInsight(
@@ -48,22 +51,18 @@ ${remove0x(data)}
     contents: [{ parts: [{ text: prompt }] }],
   };
 
-  try {
-    const response = await fetch(GEMINI_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    const result = await response.json();
-    const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const response: FetchResponse = await FetchUtils.postDataToUrl(
+    GEMINI_ENDPOINT,
+    body,
+  );
+  if (response.success) {
+    const rawText = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/u);
     const jsonString = jsonMatch ? jsonMatch[1] : rawText;
 
     return JSON.parse(jsonString);
-  } catch (error) {
-    console.error('Gemini decode error:', error);
-    return null;
   }
+
+  return null;
 }

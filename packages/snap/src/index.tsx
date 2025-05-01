@@ -15,31 +15,36 @@ import {
   Box,
   Text,
   Bold,
-  Button,
+  Heading,
   Container,
   Footer,
-  Heading,
+  Button,
 } from '@metamask/snaps-sdk/jsx';
-import { assert, hasProperty } from '@metamask/utils';
+import { assert } from '@metamask/utils';
 
 import { getGeminiDecodedInsight, type GeminiResult } from './llm';
 import type { AccountInfo } from './types/account';
 import { decodeData } from './utils';
-import { HederaUtils } from './utils/HederaUtils';
+import type { FetchResponse } from './utils/FetchUtils';
+import { FetchUtils } from './utils/FetchUtils';
+import { decodeTransaction, HederaUtils, isHTS } from './utils/HederaUtils';
+import { validateTransaction } from './validation';
 
-const ERC20_ABI = [
-  {
-    constant: false,
-    inputs: [
-      { name: '_to', type: 'address' },
-      { name: '_value', type: 'uint256' },
-    ],
-    name: 'transfer',
-    outputs: [{ name: '', type: 'bool' }],
-    payable: false,
-    stateMutability: 'nonpayable',
-    type: 'function',
-  },
+const erc20Abi = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function associate() external returns (uint256)',
+  'function dissociate() external returns (uint256)',
+  'function isAssociated() external view returns (bool)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function transfer(address recipient, uint256 amount) external returns (bool)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) external returns (bool)',
+  'function increaseAllowance(address spender, uint256 addedValue) public returns (bool)',
+  'event Approval(address indexed owner, address indexed spender, uint256 value)',
 ];
 
 /**
@@ -75,73 +80,127 @@ export const onTransaction: OnTransactionHandler = async ({
     return {
       content: panel([
         row(
-          'Network Error',
-          text('Please connect to Hedera Mainnet|Testnet|Previewnet'),
+          'Unsupported Network',
+          text(
+            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the Transaction Insights',
+          ),
         ),
       ]),
     };
   }
 
-  if (
-    hasProperty(transaction, 'data') &&
-    typeof transaction.data === 'string'
-  ) {
-    const transactionFrom = transaction.from as `0x${string}`;
-    const accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
-      transactionFrom,
-      'https://testnet.mirrornode.hedera.com',
-    );
+  const transactionFrom = transaction.from as `0x${string}`;
+  const transactionTo = transaction.to
+    ? (transaction.to as `0x${string}`)
+    : 'N/A';
 
-    if (!accountInfo) {
-      return {
-        content: panel([
-          row(
-            'Invalid accountId',
-            text('This account has no account Id associated with it'),
-          ),
-        ]),
-      };
+  // Check if it's a valid hedera accountId
+  let accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
+    transactionFrom,
+    'https://testnet.mirrornode.hedera.com',
+  );
+  if (!accountInfo.accountId) {
+    accountInfo = {} as AccountInfo;
+    accountInfo.accountId = 'N/A';
+  }
+
+  let type = 'N/A';
+  let rows: any[] = [];
+
+  if (transaction.data) {
+    const isContractCreate =
+      transaction.to === null || transaction.to === undefined;
+    // do the ABI retrieval
+    if (isContractCreate) {
+      type = 'Contract Create';
+    } else {
+      const isHTSToken = isHTS(transaction.to);
+      let abi = [];
+      if (isHTSToken) {
+        abi = erc20Abi;
+        const { signature, args } = decodeTransaction(abi, transaction.data);
+
+        rows = [
+          row('To', text(transactionTo)),
+          row('Signature', text(signature)),
+          row('Arguments', text(args)),
+          row('Verified', text('True')),
+          row('Hedera native token', text(`True`)),
+        ];
+      } else {
+        const response: FetchResponse = await FetchUtils.fetchDataFromUrl(
+          `https://server-verify.hashscan.io/files/any/296/${transaction.to}`,
+        );
+
+        if (response.success) {
+          abi = JSON.parse(response?.data?.files[0]?.content)?.output.abi;
+
+          const { signature, args } = decodeTransaction(abi, transaction.data);
+
+          const geminiResult: GeminiResult | null =
+            await getGeminiDecodedInsight(abi, transaction.data);
+
+          rows = [
+            row('To', text(transactionTo)),
+            row('Signature', text(signature)),
+            row('Arguments', text(args)),
+            row('Verified', text('True')),
+            row('Hedera native token', text(`False`)),
+            geminiResult
+              ? row('Function', text(geminiResult.functionName))
+              : row('Function', text('Unknown')),
+            geminiResult
+              ? row('Summary', text(geminiResult.summary))
+              : row('Summary', text('No insight available')),
+            geminiResult
+              ? row('Safety', text(geminiResult.safetyAssessment))
+              : row('Safety', text('Not analyzed')),
+            geminiResult?.metadata?.recipient &&
+              row('Recipient', text(geminiResult.metadata.recipient)),
+            geminiResult?.metadata?.amount &&
+              row('Amount', text(geminiResult.metadata.amount)),
+            geminiResult?.redFlags?.length
+              ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
+              : row('Red Flags', text('None')),
+          ].filter(Boolean) as any[];
+        } else {
+          // we just say we can't decode
+          rows = [
+            row('To', text(transactionTo)),
+            row('Verified', text('False')),
+            row('Hedera native token', text(`False`)),
+          ];
+        }
+        type = decodeData(transaction.data);
+      }
     }
+  } else {
+    // Normal transfer
+    type = 'HBAR Transfer';
+  }
 
-    const transactionTo = transaction.to
-      ? (transaction.to as `0x${string}`)
-      : 'N/A';
-    const decodedLabel = decodeData(transaction.data);
-    const geminiResult: GeminiResult | null = await getGeminiDecodedInsight(
-      ERC20_ABI,
-      transaction.data,
-    );
-
-    return {
-      content: panel(
-        [
-          row('From', text(accountInfo.accountId)),
-          row('Contract', text(transactionTo)),
-          row('Transaction Type', text(decodedLabel)),
-          geminiResult
-            ? row('Function', text(geminiResult.functionName))
-            : row('Function', text('Unknown')),
-          geminiResult
-            ? row('Summary', text(geminiResult.summary))
-            : row('Summary', text('No insight available')),
-          geminiResult
-            ? row('Safety', text(geminiResult.safetyAssessment))
-            : row('Safety', text('Not analyzed')),
-          geminiResult?.metadata?.recipient &&
-            row('Recipient', text(geminiResult.metadata.recipient)),
-          geminiResult?.metadata?.amount &&
-            row('Amount', text(geminiResult.metadata.amount)),
-          geminiResult?.redFlags?.length
-            ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
-            : row('Red Flags', text('None')),
-        ].filter(Boolean) as any[],
-      ),
-      severity: SeverityLevel.Critical,
-    };
+  // Check if the transaction is valid based on user preferences
+  const validationResult = validateTransaction(transaction);
+  if (validationResult.shouldBeBlocked()) {
+    // Handle blocking issues
+    const blockingIssues = validationResult.getBlockingIssues();
+    console.log('Blocking issues:', blockingIssues);
+    rows.unshift(row('Blocking issues', text(blockingIssues.join(', '))));
+    return { content: panel(rows), severity: SeverityLevel.Critical };
+  } else if (validationResult.containsWarnings()) {
+    // Handle warnings
+    const warningList = validationResult.getWarnings();
+    console.log('Warnings:', warningList);
+    rows.unshift(row('Warnings', text(warningList.join(', '))));
+    return { content: panel(rows) };
   }
 
   return {
-    content: panel([row('Transaction type', text('Unknown'))]),
+    content: panel([
+      row('Transaction type', text(type)),
+      row('From', text(accountInfo.accountId)),
+      ...rows,
+    ]),
   };
 };
 
@@ -160,7 +219,7 @@ export const onHomePage: OnHomePageHandler = async () => {
           <Text>Welcome to my Snap home page!</Text>
         </Box>
         <Footer>
-          <Button name="footer_button">Footer button</Button>
+          <Button name="footer_button">Configure preferences</Button>
         </Footer>
       </Container>
     ),
@@ -181,6 +240,19 @@ export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
   // directly.
   assert(event.type === UserInputEventType.ButtonClickEvent);
   assert(event.name === 'footer_button');
+
+  await snap.request({
+    method: 'snap_dialog',
+    params: {
+      type: 'alert',
+      content: (
+        <Box>
+          <Heading>Alert heading</Heading>
+          <Text>Something happened in the system.</Text>
+        </Box>
+      ),
+    },
+  });
 
   await snap.request({
     method: 'snap_updateInterface',

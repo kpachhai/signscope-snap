@@ -34,7 +34,7 @@ export function decodeData(data: string): string {
     (value) => value.signature === signature,
   );
 
-  return functionSignature?.name ?? 'Unknown';
+  return functionSignature?.name ?? 'Contract Call';
 }
 
 export async function saveValue(keyName: string, newValue: string) {
