@@ -1,6 +1,5 @@
 import type {
   OnHomePageHandler,
-  OnRpcRequestHandler,
   OnTransactionHandler,
   OnUserInputHandler,
 } from '@metamask/snaps-sdk';
@@ -76,9 +75,8 @@ export const onTransaction: OnTransactionHandler = async ({
   transaction,
   chainId,
 }) => {
-
   // Check if the transaction is valid based on user preferences
-  let chainID = extractChainId(chainId);
+  const chainID = extractChainId(chainId);
 
   if (
     chainID !== '295' && // Mainnet
@@ -116,17 +114,26 @@ export const onTransaction: OnTransactionHandler = async ({
   }
 
   const transactionFrom = transaction.from as `0x${string}`;
-  let senderAccountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(transactionFrom, mirrorNodeURL.toString(),);
+  let senderAccountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
+    transactionFrom,
+    mirrorNodeURL as string,
+  );
   if (!senderAccountInfo.accountId) {
     senderAccountInfo = {} as AccountInfo;
     senderAccountInfo.accountId = 'N/A';
   }
 
-  let transactionTo = 'N/A'
-  if(transaction.to) {
+  let transactionTo = 'N/A';
+  if (transaction.to) {
     transactionTo = transaction.to as `0x${string}`;
-    let recipientAccountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(transactionTo, mirrorNodeURL.toString(),);
-    if (recipientAccountInfo.accountId) transactionTo = recipientAccountInfo.accountId;
+    const recipientAccountInfo: AccountInfo =
+      await HederaUtils.getMirrorAccountInfo(
+        transactionTo,
+        mirrorNodeURL as string,
+      );
+    if (recipientAccountInfo.accountId) {
+      transactionTo = recipientAccountInfo.accountId;
+    }
   }
 
   console.log('Transaction to:', transactionTo);
@@ -135,7 +142,6 @@ export const onTransaction: OnTransactionHandler = async ({
   let rows: any[] = [];
 
   if (transaction.data && transaction.data !== '0x') {
-
     console.log('Transaction data:', transaction.data);
 
     const isContractCreate =
@@ -158,9 +164,11 @@ export const onTransaction: OnTransactionHandler = async ({
           row('Hedera Native Token', text(`True`)),
         ];
       } else {
-        let sourcifyURL = await getValue('sourcifyURL') || 'https://server-verify.hashscan.io';
+        const sourcifyURL =
+          (await getValue('sourcifyURL')) ||
+          'https://server-verify.hashscan.io';
         const response: FetchResponse = await FetchUtils.fetchDataFromUrl(
-          `${sourcifyURL}/files/any/${chainID}/${transaction.to}`,
+          `${sourcifyURL as string}/files/any/${chainID}/${transaction.to}`,
         );
 
         if (response.success) {
@@ -168,31 +176,48 @@ export const onTransaction: OnTransactionHandler = async ({
 
           const { signature, args } = decodeTransaction(abi, transaction.data);
 
-          const geminiResult: GeminiResult | null = await getGeminiDecodedInsight(abi, transaction.data, (await getValue('geminiAPIKey'))?.toString() || '');
-
           rows = [
             row('Contract', text(transactionTo)),
             row('Signature', text(signature)),
             row('Arguments', text(args)),
             row('Contract Verified', text('True')),
             row('Hedera Native Token', text(`False`)),
-            geminiResult
-              ? row('Function', text(geminiResult.functionName))
-              : row('Function', text('Unknown')),
-            geminiResult
-              ? row('Summary', text(geminiResult.summary))
-              : row('Summary', text('No insight available')),
-            geminiResult
-              ? row('Safety', text(geminiResult.safetyAssessment))
-              : row('Safety', text('Not analyzed')),
-            geminiResult?.metadata?.recipient &&
-              row('Contract', text(geminiResult.metadata.recipient)),
-            geminiResult?.metadata?.amount &&
-              row('Amount', text(geminiResult.metadata.amount)),
-            geminiResult?.redFlags?.length
-              ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
-              : row('Red Flags', text('None')),
-          ].filter(Boolean) as any[];
+          ];
+
+          const geminiAPIKey = (await getValue('geminiAPIKey')) || '';
+          if (geminiAPIKey) {
+            const geminiResult: GeminiResult | null =
+              await getGeminiDecodedInsight(
+                abi,
+                transaction.data,
+                geminiAPIKey as string,
+              );
+
+            rows = [
+              ...rows,
+              geminiResult
+                ? row('Function', text(geminiResult.functionName))
+                : row('Function', text('Unknown')),
+              geminiResult
+                ? row('Summary', text(geminiResult.summary))
+                : row('Summary', text('No insight available')),
+              geminiResult
+                ? row('Safety', text(geminiResult.safetyAssessment))
+                : row('Safety', text('Not analyzed')),
+              geminiResult?.metadata?.recipient &&
+                row('Contract', text(geminiResult.metadata.recipient)),
+              geminiResult?.metadata?.amount &&
+                row('Amount', text(geminiResult.metadata.amount)),
+              geminiResult?.redFlags?.length
+                ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
+                : row('Red Flags', text('None')),
+            ].filter(Boolean);
+          } else {
+            rows = [
+              ...rows,
+              row('LLM', text('Not configured to generate insights')),
+            ];
+          }
         } else {
           // we just say we can't decode
           rows = [
@@ -206,14 +231,12 @@ export const onTransaction: OnTransactionHandler = async ({
     }
   } else {
     // Normal transfer. Check if it's an auto account creation
-    if (transactionTo.substring(0, 2) === '0x') {
+    if (transactionTo.startsWith('0x')) {
       operation = 'HBAR Transfer + Auto Account Creation';
     } else {
       operation = 'HBAR Transfer';
     }
-    rows = [
-      row('Recipient', text(transactionTo)),
-    ]
+    rows = [row('Recipient', text(transactionTo))];
   }
 
   // Check if the transaction is valid based on user preferences
@@ -249,23 +272,24 @@ export const onTransaction: OnTransactionHandler = async ({
  */
 export const onHomePage: OnHomePageHandler = async () => {
   // Get the saved values
-  const whiteList = await getValue('whiteList');
-  const banList = await getValue('banList');
-  const warnOver = await getValue('warnOver');
-  const onlyVerifiedSmartContract = await getValue('onlyVerifiedSmartContract');
-  const sourcifyURL = await getValue('sourcifyURL');
-  const mirrorNodeURL = await getValue('mirrorNodeURL');
-  const geminiAPIKey = await getValue('geminiAPIKey');
+  const whiteList = (await getValue('whiteList')) || '';
+  const banList = (await getValue('banList')) || '';
+  const warnOver = (await getValue('warnOver')) || '999999999';
+  const onlyVerifiedSmartContract =
+    (await getValue('onlyVerifiedSmartContract')) || '';
+  const sourcifyURL = (await getValue('sourcifyURL')) || '';
+  const mirrorNodeURL = (await getValue('mirrorNodeURL')) || '';
+  const geminiAPIKey = (await getValue('geminiAPIKey')) || '';
 
   // Create the form with the saved values
   const form = {
-    whiteList: whiteList?.toString() || '',
-    banList: banList?.toString() || '',
-    warnOver: warnOver?.toString() || '999999999',
+    whiteList,
+    banList,
+    warnOver,
     onlyVerifiedSmartContract: onlyVerifiedSmartContract === 'true',
-    sourcifyURL: sourcifyURL?.toString() || '',
-    mirrorNodeURL: mirrorNodeURL?.toString() || '',
-    geminiAPIKey: geminiAPIKey?.toString() || '',
+    sourcifyURL,
+    mirrorNodeURL,
+    geminiAPIKey,
   };
   // Create the form with the saved values
   const formValues = {
@@ -280,29 +304,58 @@ export const onHomePage: OnHomePageHandler = async () => {
 
   // Create the form
   const formComponent = (
-    <Form name="preferences" >
+    <Form name="preferences">
       <Field label="White list. Transactions to contracts in this list will be automatically approved.">
-        <Input name="whiteList" placeholder="Insert comma separated addresses." value={form.whiteList} />
+        <Input
+          name="whiteList"
+          placeholder="Insert comma separated addresses."
+          value={form.whiteList as string}
+        />
       </Field>
       <Field label="Ban list. Transactions to contracts in this list will be automatically denied">
-        <Input name="banList" placeholder="Insert comma separated addresses." value={form.banList} />
+        <Input
+          name="banList"
+          placeholder="Insert comma separated addresses."
+          value={form.banList as string}
+        />
       </Field>
       <Field label="Warn if the transaction is transferring more than this amount of HBARs.">
-        <Input name="warnOver" type="number" placeholder="Amount in HBAR." value={form.warnOver} />
+        <Input
+          name="warnOver"
+          type="number"
+          placeholder="Amount in HBAR."
+          value={form.warnOver as string}
+        />
       </Field>
       <Text> </Text>
-      <Checkbox name="onlyVerifiedSmartContract" label="Interact with verified contracts only." checked={form.onlyVerifiedSmartContract} />
+      <Checkbox
+        name="onlyVerifiedSmartContract"
+        label="Interact with verified contracts only."
+        checked={form.onlyVerifiedSmartContract}
+      />
       <Text> </Text>
       <Heading>External services configuration</Heading>
       <Text> </Text>
       <Field label="Sourcify API URL. If not specified, the public Hashscan sourcify server will be used.">
-        <Input name="sourcifyURL" placeholder="Es: https://server-verify.hashscan.io" value={form.sourcifyURL} />
+        <Input
+          name="sourcifyURL"
+          placeholder="Es: https://server-verify.hashscan.io"
+          value={form.sourcifyURL as string}
+        />
       </Field>
       <Field label="Custom Mirror Node API URL. If not specified, the public mirror nodes will be used.">
-        <Input name="mirrorNodeURL" placeholder="Es: https://mainnet.mirrornode.hedera.com/api/v1" value={form.mirrorNodeURL} />
+        <Input
+          name="mirrorNodeURL"
+          placeholder="Es: https://mainnet.mirrornode.hedera.com/api/v1"
+          value={form.mirrorNodeURL as string}
+        />
       </Field>
       <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
-        <Input name="geminiAPIKey" placeholder="XXX" value={form.geminiAPIKey} />
+        <Input
+          name="geminiAPIKey"
+          placeholder="XXX"
+          value={form.geminiAPIKey as string}
+        />
       </Field>
     </Form>
   );
@@ -311,10 +364,14 @@ export const onHomePage: OnHomePageHandler = async () => {
     <Container>
       <Box>
         <Heading>Welcome to the Hedera Insight Snap configuration.</Heading>
-        <Text>Here you can configure some options to customize your experience.</Text>
+        <Text>
+          Here you can configure some options to customize your experience.
+        </Text>
         {formComponent}
         <Text> </Text>
-        <Button type="submit" form='preferences'>Save preferences</Button>
+        <Button type="submit" form="preferences">
+          Save preferences
+        </Button>
       </Box>
     </Container>
   );
@@ -336,7 +393,6 @@ export const onHomePage: OnHomePageHandler = async () => {
 export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
   assert(event.type === UserInputEventType.FormSubmitEvent);
 
-  // Get the form values
   const formValues = event.value as {
     whiteList: string;
     banList: string;
@@ -347,24 +403,35 @@ export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
     geminiAPIKey: string;
   };
 
-  saveValue('whiteList', formValues.whiteList);
-  saveValue('banList', formValues.banList);
-  saveValue('warnOver', formValues.warnOver);
-  saveValue('onlyVerifiedSmartContract', formValues.onlyVerifiedSmartContract.toString());
-  saveValue('sourcifyURL', formValues.sourcifyURL);
-  saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
-  saveValue('geminiAPIKey', formValues.geminiAPIKey);
+  try {
+    await saveValue('whiteList', formValues.whiteList);
+    await saveValue('banList', formValues.banList);
+    await saveValue('warnOver', formValues.warnOver);
+    await saveValue(
+      'onlyVerifiedSmartContract',
+      formValues.onlyVerifiedSmartContract.toString(),
+    );
+    await saveValue('sourcifyURL', formValues.sourcifyURL);
+    await saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
+    await saveValue('geminiAPIKey', formValues.geminiAPIKey);
+  } catch (error) {
+    console.error('❌ Error saving some preferences:', error);
+    return;
+  }
+
+  console.log('✅ All preferences saved. Updating UI...');
 
   await snap.request({
     method: 'snap_updateInterface',
     params: {
       id,
       ui: (
-        <Box alignment='center'>
-          <Text><Bold>Preferences saved correctly.</Bold></Text>
+        <Box alignment="center">
+          <Text>
+            <Bold>Preferences saved correctly.</Bold>
+          </Text>
         </Box>
       ),
     },
   });
-
 };

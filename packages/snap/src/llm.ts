@@ -3,7 +3,6 @@ import { remove0x } from '@metamask/utils';
 
 import type { FetchResponse } from './utils/FetchUtils';
 import { FetchUtils } from './utils/FetchUtils';
-import { getValue } from './utils';
 
 export type GeminiResult = {
   functionName: string;
@@ -12,8 +11,6 @@ export type GeminiResult = {
   redFlags: string[];
   metadata: Record<string, string>;
 };
-
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 
 export async function getGeminiDecodedInsight(
   abi: object[],
@@ -52,8 +49,10 @@ ${remove0x(data)}
     contents: [{ parts: [{ text: prompt }] }],
   };
 
+  const geminiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
+
   const response: FetchResponse = await FetchUtils.postDataToUrl(
-    GEMINI_ENDPOINT.concat(geminiApiKey),
+    geminiEndpoint,
     body,
   );
   if (response.success) {
