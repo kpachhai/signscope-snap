@@ -40,3 +40,37 @@ export function decodeData(data: string) {
 
   return functionSignature?.name ?? 'Unknown';
 }
+
+/**
+ * Set a value in the encrypted state
+ *
+ * @param keyName name of the key
+ * @param newValue new value for the key
+ * @returns promise
+ */
+export async function saveValue(keyName: string, newValue: string) {
+  return await snap.request({
+    method: 'snap_setState',
+    params: {
+      key: keyName,
+      value: newValue,
+      encrypted: true,
+    },
+  });
+}
+
+/**
+ * Get a key value from the encrypted state
+ *
+ * @param keyName name of the key
+ * @returns the value for the key
+ */
+export async function getValue(keyName: string) {
+  return await snap.request({
+    method: 'snap_getState',
+    params: {
+      key: keyName,
+      encrypted: true,
+    },
+  });
+}
