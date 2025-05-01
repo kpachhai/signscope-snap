@@ -3,9 +3,30 @@ import { Box, Text, Bold } from '@metamask/snaps-sdk/jsx';
 import type { OnTransactionHandler } from '@metamask/snaps-sdk';
 import { SeverityLevel, panel, text, row, address } from '@metamask/snaps-sdk';
 import { hasProperty } from '@metamask/utils';
+import { ethers } from 'ethers';
 
 import { decodeData } from './utils';
 
+const erc20Abi = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function decimals() view returns (uint8)',
+  'function totalSupply() view returns (uint256)',
+  'function associate() external returns (uint256)',
+  'function dissociate() external returns (uint256)',
+  'function isAssociated() external view returns (bool)',
+  'function balanceOf(address account) view returns (uint256)',
+  'function transfer(address recipient, uint256 amount) external returns (bool)',
+  'event Transfer(address indexed from, address indexed to, uint256 value)',
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) external returns (bool)',
+  'function increaseAllowance(address spender, uint256 addedValue) public returns (bool)',
+  'event Approval(address indexed owner, address indexed spender, uint256 value)',
+];
+
+function isHTS(inputString: string) {
+  return inputString.startsWith('0x00000000000');
+}
 
 /**
  * Handle incoming transactions, sent through the `wallet_sendTransaction`
@@ -32,6 +53,24 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
     typeof transaction.data === 'string'
   ) {
     const type = decodeData(transaction.data);
+    console.log(transaction);
+    const iface = new ethers.Interface(erc20Abi);
+    const decodedData = iface.parseTransaction({ data: transaction.data });
+    const isHTSToken = isHTS(transaction.to).toString();
+    let functionName = 'null';
+    if (decodedData) {
+      console.log('Decoded function call:');
+      console.log('Function name:', decodedData.name);
+      console.log('Arguments:', decodedData.args);
+      console.log(
+        'Value (ETH sent with the call):',
+        decodedData.value.toString(),
+      );
+      functionName = decodedData.name;
+    } else {
+      console.log('Could not decode the transaction data as a function call.');
+    }
+
     return {
       content: panel([
         row('From', address(transaction.from as `0x${string}`)),
@@ -41,7 +80,8 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
             ? address(transaction.to as `0x${string}`)
             : text('None'),
         ),
-        row('Transaction type', text(type)),
+        row('Function name', text(functionName)),
+        row('Hedera native token', text(isHTSToken)),
       ]),
       severity: SeverityLevel.Critical,
     };
