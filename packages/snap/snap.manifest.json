@@ -7,10 +7,11 @@
     "url": "https://github.com/kpachhai/signscope-snap.git"
   },
   "source": {
-    "shasum": "DlXThJ5qyIU5horQfPiivOp58iMjFGZKDrqLuaaaBms=",
+    "shasum": "Yo7lVi0CxqfpDmJZZGWTdCin2lsvksBbfrH0zy0FGiE=",
     "location": {
       "npm": {
         "filePath": "dist/bundle.js",
+        "iconPath": "images/hedera-hbar-logo.svg",
         "packageName": "signscope-snap",
         "registry": "https://registry.npmjs.org/"
       }

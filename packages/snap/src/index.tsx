@@ -10,6 +10,7 @@ import {
   text,
   row,
   UserInputEventType,
+  RowVariant,
 } from '@metamask/snaps-sdk';
 import {
   Box,
@@ -196,7 +197,7 @@ export const onTransaction: OnTransactionHandler = async ({
           // we just say we can't decode
           rows = [
             row('Contract', text(transactionTo)),
-            row('Contract Verified', text('False')),
+            row('Contract Verified', text('False'), RowVariant.Critical),
             row('Hedera Native Token', text(`False`)),
           ];
         }
@@ -211,7 +212,7 @@ export const onTransaction: OnTransactionHandler = async ({
       operation = 'HBAR Transfer';
     }
     rows = [
-      row('To', text(transactionTo)),
+      row('Recipient', text(transactionTo)),
     ]
   }
 
