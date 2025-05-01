@@ -133,12 +133,24 @@ export const onTransaction: OnTransactionHandler = async ({
         );
 
         if (response.success) {
-          abi = JSON.parse(response?.data?.files[0]?.content)?.output.abi;
+          const metadataFile = response.data.files.find((f) =>
+            f.name.endsWith('metadata.json'),
+          );
+
+          const sourceFile = response.data.files.find((f) =>
+            f.name.endsWith('.sol'),
+          );
+
+          abi = metadataFile
+            ? (JSON.parse(metadataFile.content)?.output?.abi ?? [])
+            : [];
+
+          const sourceCode = sourceFile?.content ?? '';
 
           const { signature, args } = decodeTransaction(abi, transaction.data);
 
           const geminiResult: GeminiResult | null =
-            await getGeminiDecodedInsight(abi, transaction.data);
+            await getGeminiDecodedInsight(abi, transaction.data, sourceCode);
 
           rows = [
             row('To', text(transactionTo)),
@@ -148,7 +160,7 @@ export const onTransaction: OnTransactionHandler = async ({
             row('Hedera native token', text(`False`)),
             geminiResult
               ? row('Function', text(geminiResult.functionName))
-              : row('Function', text('Unknown')),
+              : row('Function', text('Not analyzed')),
             geminiResult
               ? row('Summary', text(geminiResult.summary))
               : row('Summary', text('No insight available')),
@@ -161,16 +173,16 @@ export const onTransaction: OnTransactionHandler = async ({
               row('Amount', text(geminiResult.metadata.amount)),
             geminiResult?.redFlags?.length
               ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
-              : row('Red Flags', text('None')),
+              : row('Red Flags', text('Not analyzed')),
           ].filter(Boolean) as any[];
         } else {
-          // we just say we can't decode
           rows = [
             row('To', text(transactionTo)),
             row('Verified', text('False')),
             row('Hedera native token', text(`False`)),
           ];
         }
+
         type = decodeData(transaction.data);
       }
     }
