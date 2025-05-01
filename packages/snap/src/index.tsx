@@ -260,13 +260,31 @@ export const onTransaction: OnTransactionHandler = async ({
                 summaryText.includes('can be exploited');
 
               const hasPayloadSpecificRisk =
-                containsCriticalFlags ||
-                summaryText.includes('this transaction') ||
-                summaryText.includes('provided arguments') ||
-                redFlagsText.includes('this transaction');
+                effectiveAssessment !== 'safe' && containsCriticalFlags;
 
               if (containsCriticalFlags && isFunctionMatch) {
                 effectiveAssessment = 'dangerous';
+              }
+
+              const inferredRecipientAddress =
+                geminiResult.metadata?.recipient || '';
+              let inferredRecipient = inferredRecipientAddress;
+
+              if (inferredRecipientAddress.startsWith('0x')) {
+                try {
+                  const resolved = await HederaUtils.getMirrorAccountInfo(
+                    inferredRecipientAddress,
+                    mirrorNodeURL as string,
+                  );
+                  if (resolved.accountId) {
+                    inferredRecipient = resolved.accountId;
+                  }
+                } catch (error: any) {
+                  console.warn(
+                    'Could not resolve inferred recipient to account ID:',
+                    error,
+                  );
+                }
               }
 
               const insightRows = [
@@ -318,10 +336,7 @@ export const onTransaction: OnTransactionHandler = async ({
                 ),
 
                 geminiResult.metadata?.recipient
-                  ? row(
-                      'Inferred Recipient',
-                      text(geminiResult.metadata.recipient),
-                    )
+                  ? row('Inferred Recipient', text(inferredRecipient))
                   : null,
 
                 geminiResult.metadata?.amount
@@ -339,7 +354,7 @@ export const onTransaction: OnTransactionHandler = async ({
                     ? RowVariant.Warning
                     : RowVariant.Default,
                 ),
-              ].filter(Boolean); // remove nulls
+              ].filter(Boolean);
 
               rows.push(...insightRows);
             } else {
