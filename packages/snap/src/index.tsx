@@ -372,9 +372,15 @@ export const onTransaction: OnTransactionHandler = async ({
             row('Contract Verified', text('False'), RowVariant.Critical),
             row('Hedera Native Token', text(`False`)),
           ];
-          if(await getValue('onlyVerifiedSmartContract') === 'true') {
+          if ((await getValue('onlyVerifiedSmartContract')) === 'true') {
             rows.unshift(
-              row('Warnings:',text('The contract is not verified. Please verify the contract to interact with it.',),RowVariant.Critical,),
+              row(
+                'Warnings:',
+                text(
+                  'The contract is not verified. Please verify the contract to interact with it.',
+                ),
+                RowVariant.Critical,
+              ),
             );
           }
         }
@@ -470,60 +476,60 @@ export const onHomePage: OnHomePageHandler = async () => {
   const formComponent = (
     <Form name="preferences">
       <Section>
-      <Heading>Warning preferences</Heading>
-      <Field label="White list. Transactions to contracts in this list will not be checked for validity.">
-        <Input
-          name="whiteList"
-          placeholder="Insert comma separated addresses."
-          value={form.whiteList as string}
+        <Heading>Warning preferences</Heading>
+        <Field label="White list. Transactions to contracts in this list will not be checked for validity.">
+          <Input
+            name="whiteList"
+            placeholder="Insert comma separated addresses."
+            value={form.whiteList as string}
+          />
+        </Field>
+        <Field label="Ban list. Transactions sent to these contracts will be flagged as blocked.">
+          <Input
+            name="banList"
+            placeholder="Insert comma separated addresses."
+            value={form.banList as string}
+          />
+        </Field>
+        <Field label="Warn if the transaction is transferring more than this amount of HBARs.">
+          <Input
+            name="warnOver"
+            type="number"
+            placeholder="Amount in HBAR."
+            step={1}
+            value={form.warnOver as string}
+          />
+        </Field>
+        <Checkbox
+          name="onlyVerifiedSmartContract"
+          label="Interact with verified contracts only."
+          checked={form.onlyVerifiedSmartContract}
         />
-      </Field>
-      <Field label="Ban list. Transactions sent to these contracts will be flagged as blocked.">
-        <Input
-          name="banList"
-          placeholder="Insert comma separated addresses."
-          value={form.banList as string}
-        />
-      </Field>
-      <Field label="Warn if the transaction is transferring more than this amount of HBARs.">
-        <Input
-          name="warnOver"
-          type="number"
-          placeholder="Amount in HBAR."
-          step={1}
-          value={form.warnOver as string}
-        />
-      </Field>
-      <Checkbox
-        name="onlyVerifiedSmartContract"
-        label="Interact with verified contracts only."
-        checked={form.onlyVerifiedSmartContract}
-      />
       </Section>
       <Section>
-      <Heading>External services configuration</Heading>
-      <Field label="Sourcify API URL. If not specified, the public Hashscan sourcify server will be used.">
-        <Input
-          name="sourcifyURL"
-          placeholder="Es: https://server-verify.hashscan.io"
-          value={form.sourcifyURL as string}
-        />
-      </Field>
-      <Field label="Custom Mirror Node API URL. If not specified, the public mirror nodes will be used.">
-        <Input
-          name="mirrorNodeURL"
-          placeholder="Es: https://testnet.mirrornode.hedera.com/api/v1"
-          value={form.mirrorNodeURL as string}
-        />
-      </Field>
-      <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
-        <Input
-          name="geminiAPIKey"
-          type="password"
-          placeholder="aBcD..."
-          value={form.geminiAPIKey as string}
-        />
-      </Field>
+        <Heading>External services configuration</Heading>
+        <Field label="Sourcify API URL. If not specified, the public Hashscan sourcify server will be used.">
+          <Input
+            name="sourcifyURL"
+            placeholder="Es: https://server-verify.hashscan.io"
+            value={form.sourcifyURL as string}
+          />
+        </Field>
+        <Field label="Custom Mirror Node API URL. If not specified, the public mirror nodes will be used.">
+          <Input
+            name="mirrorNodeURL"
+            placeholder="Es: https://testnet.mirrornode.hedera.com/api/v1"
+            value={form.mirrorNodeURL as string}
+          />
+        </Field>
+        <Field label="Gemini API Key. If not specified, no LLM will be used to analyze transactions.">
+          <Input
+            name="geminiAPIKey"
+            type="password"
+            placeholder="aBcD..."
+            value={form.geminiAPIKey as string}
+          />
+        </Field>
       </Section>
     </Form>
   );

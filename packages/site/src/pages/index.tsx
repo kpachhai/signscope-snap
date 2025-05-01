@@ -8,7 +8,7 @@ import {
   ConnectButton,
   InstallFlaskButton,
   ReconnectButton,
-  SendHelloButton,
+  TransferButton,
   Card,
   DepositButton,
   WithdrawButton,
@@ -124,11 +124,8 @@ const Index = () => {
   return (
     <Container>
       <Heading>
-        Welcome to <Span>template-snap</Span>
+        Welcome to <Span>SignScope Service Snap(S4)</Span>
       </Heading>
-      <Subtitle>
-        Get started by editing <code>src/index.tsx</code>
-      </Subtitle>
       <CardContainer>
         {error && (
           <ErrorMessage>
@@ -178,38 +175,10 @@ const Index = () => {
             disabled={!installedSnap}
           />
         )}
-        <Card
-          content={{
-            title: 'Send Hello message',
-            description:
-              'Display a custom message within a confirmation screen in MetaMask.',
-            button: (
-              <SendHelloButton
-                onClick={handleSendHelloClick}
-                disabled={!installedSnap}
-              />
-            ),
-          }}
-          disabled={!installedSnap}
-          fullWidth={
-            isMetaMaskReady &&
-            Boolean(installedSnap) &&
-            !shouldDisplayReconnectButton(installedSnap)
-          }
-        />
 
         <TransferTokenComponent />
         <OverflowContractComponent />
         <ReentryComponent />
-
-        <Notice>
-          <p>
-            Please note that the <b>snap.manifest.json</b> and{' '}
-            <b>package.json</b> must be located in the server root directory and
-            the bundle must be hosted at the location specified by the location
-            field.
-          </p>
-        </Notice>
       </CardContainer>
     </Container>
   );
@@ -304,7 +273,7 @@ const TransferTokenComponent = () => {
         value={amount}
         onChange={(element) => setAmount(element.target.value)}
       />
-      <SendHelloButton onClick={handleTransfer}>Transfer Token</SendHelloButton>
+      <TransferButton onClick={handleTransfer}>Transfer Token</TransferButton>
     </TransferTokenContainer>
   );
 };
@@ -443,6 +412,7 @@ const ReentryComponent = () => {
       />
 
       <DepositButton onClick={handleDeposit}>Deposit</DepositButton>
+      <br />
       <WithdrawButton onClick={handleWithdraw}>Withdraw</WithdrawButton>
     </TransferTokenContainer>
   );
