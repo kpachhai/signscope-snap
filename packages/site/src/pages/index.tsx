@@ -1,6 +1,6 @@
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { BrowserProvider, Contract } from 'ethers';
+import { BrowserProvider, Contract, ethers } from 'ethers';
 import { useState } from 'react';
 import styled from 'styled-components';
 
@@ -10,6 +10,9 @@ import {
   ReconnectButton,
   SendHelloButton,
   Card,
+  DepositButton,
+  WithdrawButton,
+  CallContractButton,
 } from '../components';
 import { defaultSnapOrigin } from '../config';
 import {
@@ -196,6 +199,8 @@ const Index = () => {
         />
 
         <TransferTokenComponent />
+        <OverflowContractComponent />
+        <ReentryComponent />
 
         <Notice>
           <p>
@@ -229,6 +234,15 @@ const Input = styled.input`
 type ERC20 = {
   decimals(): Promise<number>;
   transfer(to: string, amount: bigint): Promise<any>;
+};
+
+type Overflow = {
+  add(value: bigint): Promise<any>;
+};
+
+type Reentry = {
+  deposit(overrides?: { value: bigint }): Promise<any>;
+  withdraw(): Promise<any>;
 };
 
 const TransferTokenComponent = () => {
@@ -292,6 +306,148 @@ const TransferTokenComponent = () => {
         onChange={(element) => setAmount(element.target.value)}
       />
       <SendHelloButton onClick={handleTransfer}>Transfer Token</SendHelloButton>
+    </TransferTokenContainer>
+  );
+};
+
+const OverflowContractComponent = () => {
+  const [contractAddress, setContractAddress] = useState(
+    '0x159f70f37aec3ea5b60e34436ed4e5fd9a123539',
+  );
+  const [add, setAdd] = useState('5');
+
+  const handleTransfer = async () => {
+    if (!(window as any).ethereum) {
+      alert('MetaMask is not available');
+      return;
+    }
+
+    try {
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+
+      const overflowAbi = ['function add(uint256 value) returns (bool)'];
+      const contract = new Contract(
+        contractAddress,
+        overflowAbi,
+        signer,
+      ) as unknown as Overflow;
+
+      const tx = await contract.add(BigInt(add));
+      await tx.wait();
+
+      alert(`Transaction sent! Hash: ${tx.hash}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <TransferTokenContainer>
+      <h3>Overflow Contract</h3>
+      <Input
+        placeholder="Overflow Contract Address"
+        value={contractAddress}
+        onChange={(element) => setContractAddress(element.target.value)}
+      />
+      <Input
+        placeholder="Add"
+        value={add}
+        onChange={(element) => setAdd(element.target.value)}
+      />
+
+      <CallContractButton onClick={handleTransfer}>
+        Call Contract
+      </CallContractButton>
+    </TransferTokenContainer>
+  );
+};
+
+const ReentryComponent = () => {
+  const [contractAddress, setContractAddress] = useState(
+    '0xa3ee3ee9407452009fe465b45dc25f5f0d9337dd',
+  );
+  const [amount, setAmount] = useState('1');
+
+  const handleDeposit = async () => {
+    if (!(window as any).ethereum) {
+      alert('MetaMask is not available');
+      return;
+    }
+
+    try {
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+
+      const reentryAbi = [
+        'function deposit() payable',
+        'function withdraw() payable',
+      ];
+      const contract = new Contract(
+        contractAddress,
+        reentryAbi,
+        signer,
+      ) as unknown as Reentry;
+
+      const tx = await contract.deposit({
+        value: ethers.parseEther(amount),
+      });
+      await tx.wait();
+
+      alert(`Transaction sent! Hash: ${tx.hash}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!(window as any).ethereum) {
+      alert('MetaMask is not available');
+      return;
+    }
+
+    try {
+      const provider = new BrowserProvider((window as any).ethereum);
+      const signer = await provider.getSigner();
+
+      const reentryAbi = [
+        'function deposit() payable',
+        'function withdraw() payable',
+      ];
+      const contract = new Contract(
+        contractAddress,
+        reentryAbi,
+        signer,
+      ) as unknown as Reentry;
+
+      const tx = await contract.withdraw();
+      await tx.wait();
+
+      alert(`Transaction sent! Hash: ${tx.hash}`);
+    } catch (error: any) {
+      console.error(error);
+      alert(`Error: ${error.message}`);
+    }
+  };
+
+  return (
+    <TransferTokenContainer>
+      <h3>Reentry Contract</h3>
+      <Input
+        placeholder="Reentry Contract Address"
+        value={contractAddress}
+        onChange={(element) => setContractAddress(element.target.value)}
+      />
+      <Input
+        placeholder="amount"
+        value={amount}
+        onChange={(element) => setAmount(element.target.value)}
+      />
+
+      <DepositButton onClick={handleDeposit}>Deposit</DepositButton>
+      <WithdrawButton onClick={handleWithdraw}>Withdraw</WithdrawButton>
     </TransferTokenContainer>
   );
 };

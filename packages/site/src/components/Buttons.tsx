@@ -99,6 +99,18 @@ export const SendHelloButton = (props: ComponentProps<typeof Button>) => {
   return <Button {...props}>Send message</Button>;
 };
 
+export const CallContractButton = (props: ComponentProps<typeof Button>) => {
+  return <Button {...props}>Call Contract</Button>;
+};
+
+export const DepositButton = (props: ComponentProps<typeof Button>) => {
+  return <Button {...props}>Deposit</Button>;
+};
+
+export const WithdrawButton = (props: ComponentProps<typeof Button>) => {
+  return <Button {...props}>Withdraw</Button>;
+};
+
 export const HeaderButtons = () => {
   const requestSnap = useRequestSnap();
   const { isFlask, installedSnap } = useMetaMask();
