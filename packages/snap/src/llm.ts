@@ -13,19 +13,21 @@ export type GeminiResult = {
 };
 
 export async function getGeminiDecodedInsight(
-  abi: object[],
-  data: string,
   geminiApiKey: string,
+  data: string,
+  abi: object[],
+  sourceCode?: string, // optional contract code
 ): Promise<GeminiResult | null> {
   const prompt = `
-You are a blockchain security expert. Given a smart contract ABI and a transaction payload (function selector and calldata), perform the following:
+You are a blockchain security expert. Given a smart contract ABI, source code (if available), and a transaction payload (function selector and calldata), perform the following tasks:
 
 1. Decode the transaction data using the ABI.
-2. Identify the function being called and its arguments.
-3. Explain what this function does in plain English.
-4. Assess the safety of this transaction: is it safe, suspicious, or dangerous?
-5. List any red flags (e.g., unknown calls, high approvals, proxy delegation, contract ownership changes).
-6. Extract key metadata such as recipient address, amount, and function name.
+2. Identify the function being called and the arguments passed.
+3. Review the **smart contract source code** for how the function is implemented.
+4. Explain in plain English what the transaction does.
+5. Assess whether this transaction appears **safe**, **suspicious**, or **dangerous** based on the function logic and data passed.
+6. Detect any red flags such as unsafe math, unrestricted external calls, reentrancy risks, large approvals, proxy delegation, etc.
+7. Extract and summarize key metadata such as recipient, amount, and function name.
 
 Respond ONLY in the following JSON format:
 {
@@ -33,13 +35,18 @@ Respond ONLY in the following JSON format:
   "summary": "...",
   "safetyAssessment": "safe | suspicious | dangerous",
   "redFlags": ["..."],
-  "metadata": { "recipient": "...", "amount": "..." }
+  "metadata": {
+    "recipient": "...",
+    "amount": "..."
+  }
 }
 
 ---
 
 Contract ABI:
 ${JSON.stringify(abi, null, 2)}
+
+${sourceCode ? `\nSmart Contract Source Code:\n${sourceCode}` : ''}
 
 Transaction Payload (hex):
 ${remove0x(data)}
@@ -55,9 +62,9 @@ ${remove0x(data)}
     geminiEndpoint,
     body,
   );
+
   if (response.success) {
     const rawText = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
     const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/u);
     const jsonString = jsonMatch ? jsonMatch[1] : rawText;
 

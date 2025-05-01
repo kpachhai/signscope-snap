@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/prefer-nullish-coalescing */
 import type {
   OnHomePageHandler,
   OnTransactionHandler,
@@ -172,7 +173,19 @@ export const onTransaction: OnTransactionHandler = async ({
         );
 
         if (response.success) {
-          abi = JSON.parse(response?.data?.files[0]?.content)?.output.abi;
+          const metadataFile = response.data.files.find((file: any) =>
+            file.name.endsWith('metadata.json'),
+          );
+
+          const sourceFile = response.data.files.find((file: any) =>
+            file.name.endsWith('.sol'),
+          );
+
+          abi = metadataFile
+            ? (JSON.parse(metadataFile.content)?.output?.abi ?? [])
+            : [];
+
+          const sourceCode = sourceFile?.content ?? '';
 
           const { signature, args } = decodeTransaction(abi, transaction.data);
 
@@ -188,16 +201,17 @@ export const onTransaction: OnTransactionHandler = async ({
           if (geminiAPIKey) {
             const geminiResult: GeminiResult | null =
               await getGeminiDecodedInsight(
-                abi,
-                transaction.data,
                 geminiAPIKey as string,
+                transaction.data,
+                abi,
+                sourceCode,
               );
 
             rows = [
               ...rows,
               geminiResult
                 ? row('Function', text(geminiResult.functionName))
-                : row('Function', text('Unknown')),
+                : row('Function', text('Not analyzed')),
               geminiResult
                 ? row('Summary', text(geminiResult.summary))
                 : row('Summary', text('No insight available')),
@@ -210,7 +224,7 @@ export const onTransaction: OnTransactionHandler = async ({
                 row('Amount', text(geminiResult.metadata.amount)),
               geminiResult?.redFlags?.length
                 ? row('Red Flags', text(geminiResult.redFlags.join(', ')))
-                : row('Red Flags', text('None')),
+                : row('Red Flags', text('Not analyzed')),
             ].filter(Boolean);
           } else {
             rows = [
@@ -219,7 +233,6 @@ export const onTransaction: OnTransactionHandler = async ({
             ];
           }
         } else {
-          // we just say we can't decode
           rows = [
             row('Contract', text(transactionTo)),
             row('Contract Verified', text('False'), RowVariant.Critical),
@@ -290,16 +303,6 @@ export const onHomePage: OnHomePageHandler = async () => {
     sourcifyURL,
     mirrorNodeURL,
     geminiAPIKey,
-  };
-  // Create the form with the saved values
-  const formValues = {
-    whiteList: form.whiteList,
-    banList: form.banList,
-    warnOver: form.warnOver,
-    onlyVerifiedSmartContract: form.onlyVerifiedSmartContract,
-    sourcifyURL: form.sourcifyURL,
-    mirrorNodeURL: form.mirrorNodeURL,
-    geminiAPIKey: form.geminiAPIKey,
   };
 
   // Create the form
@@ -406,7 +409,10 @@ export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
   saveValue('whiteList', formValues.whiteList);
   saveValue('banList', formValues.banList);
   saveValue('warnOver', formValues.warnOver);
-  saveValue('onlyVerifiedSmartContract', formValues.onlyVerifiedSmartContract.toString());
+  saveValue(
+    'onlyVerifiedSmartContract',
+    formValues.onlyVerifiedSmartContract.toString(),
+  );
   saveValue('sourcifyURL', formValues.sourcifyURL);
   saveValue('mirrorNodeURL', formValues.mirrorNodeURL);
   saveValue('geminiAPIKey', formValues.geminiAPIKey);
