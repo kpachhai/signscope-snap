@@ -1,9 +1,32 @@
-import type { OnRpcRequestHandler } from '@metamask/snaps-sdk';
-import { Box, Text, Bold } from '@metamask/snaps-sdk/jsx';
-import type { OnTransactionHandler } from '@metamask/snaps-sdk';
-import { SeverityLevel, panel, text, row, address } from '@metamask/snaps-sdk';
-import { hasProperty } from '@metamask/utils';
+import type {
+  OnHomePageHandler,
+  OnRpcRequestHandler,
+  OnTransactionHandler,
+  OnUserInputHandler,
+} from '@metamask/snaps-sdk';
+import {
+  Box,
+  Text,
+  Bold,
+  Heading,
+  Container,
+  Footer,
+  Button,
+} from '@metamask/snaps-sdk/jsx';
+import {
+  SeverityLevel,
+  panel,
+  text,
+  row,
+  address,
+  UserInputEventType,
+} from '@metamask/snaps-sdk';
+import { assert, hasProperty } from '@metamask/utils';
 import { ethers } from 'ethers';
+import { AccountInfo } from './types/account';
+import { HederaUtils } from './utils/HederaUtils';
+import { validateTransaction } from './validation';
+import { decodeData } from './utils';
 
 const erc20Abi = [
   'function name() view returns (string)',
@@ -56,9 +79,60 @@ async function fetchABI(contractAddres: string) {
  * @param args - The request parameters.
  * @param args.transaction - The transaction object. This contains the
  * transaction parameters, such as the `from`, `to`, `value`, and `data` fields.
+ * @param args.chainId - The CAIP-2 {@link CaipChainId} of the network the transaction is
+ * being submitted to.
  * @returns The transaction insights.
  */
-export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
+export const onTransaction: OnTransactionHandler = async ({
+  transaction,
+  chainId,
+}) => {
+  // Check if it's a valid hedera network
+  if (
+    chainId !== 'eip155:295' && // Mainnet
+    chainId !== 'eip155:296' && // Testnet
+    chainId !== 'eip155:297' // Previewnet
+  ) {
+    return {
+      content: panel([
+        row(
+          'Network Error',
+          text(
+            'Please connect to Hedera Mainnet, Testnet or Previewnet to enable the insight',
+          ),
+        ),
+      ]),
+    };
+  }
+
+  // Check
+  const validationResult = validateTransaction(transaction);
+  if (validationResult.shouldBeBlocked()) {
+    // Handle blocking issues
+    let blockingIssues = validationResult.getBlockingIssues();
+  } else if (validationResult.containsWarnings()) {
+    // Handle warnings
+    let warningList = validationResult.getWarnings();
+  }
+
+  const transactionFrom = transaction.from as `0x${string}`;
+  const transactionTo = transaction.to
+    ? (transaction.to as `0x${string}`)
+    : 'N/A';
+
+  // Check if it's a valid hedera accountId
+  let accountInfo: AccountInfo = await HederaUtils.getMirrorAccountInfo(
+    transactionFrom,
+    'https://testnet.mirrornode.hedera.com',
+  );
+  if (!accountInfo.accountId) {
+    accountInfo = {} as AccountInfo;
+    accountInfo.accountId = 'N/A';
+  }
+
+  console.log('Account info:', accountInfo);
+
+  let type = 'N/A';
   if (
     hasProperty(transaction, 'data') &&
     typeof transaction.data === 'string'
@@ -98,9 +172,71 @@ export const onTransaction: OnTransactionHandler = async ({ transaction }) => {
       ]),
       severity: SeverityLevel.Critical,
     };
+    // Smart contract dedicated functions
+    type = decodeData(transaction.data);
+  } else {
+    // Normal transfer
+    type = 'HBAR Transfer';
   }
 
-  return { content: panel([row('Transaction type', text('Unknown'))]) };
+  return {
+    content: panel([
+      row('From (Account Id)', text(accountInfo.accountId)),
+      row('To', text(transactionTo)),
+      row('Transaction type', text(type)),
+    ]),
+    severity: SeverityLevel.Critical,
+  };
+};
+
+/**
+ * Handle incoming home page requests from the MetaMask clients.
+ *
+ * @returns A static panel rendered with custom UI.
+ * @see https://docs.metamask.io/snaps/reference/exports/#onhomepage
+ */
+export const onHomePage: OnHomePageHandler = async () => {
+  return {
+    content: (
+      <Container>
+        <Box>
+          <Heading>Hello world!</Heading>
+          <Text>Welcome to my Snap home page!</Text>
+        </Box>
+        <Footer>
+          <Button name="footer_button">Footer button</Button>
+        </Footer>
+      </Container>
+    ),
+  };
+};
+
+/**
+ * Handle incoming user events coming from the Snap interface.
+ *
+ * @param params - The event parameters.
+ * @param params.id - The Snap interface ID where the event was fired.
+ * @param params.event - The event object containing the event type, name and
+ * value.
+ * @see https://docs.metamask.io/snaps/reference/exports/#onuserinput
+ */
+export const onUserInput: OnUserInputHandler = async ({ event, id }) => {
+  // Since this Snap only has one event, we can assert the event type and name
+  // directly.
+  assert(event.type === UserInputEventType.ButtonClickEvent);
+  assert(event.name === 'footer_button');
+
+  await snap.request({
+    method: 'snap_updateInterface',
+    params: {
+      id,
+      ui: (
+        <Box>
+          <Text>Footer button was pressed</Text>
+        </Box>
+      ),
+    },
+  });
 };
 
 /**

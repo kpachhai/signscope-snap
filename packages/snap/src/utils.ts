@@ -7,16 +7,16 @@ import { remove0x } from '@metamask/utils';
  */
 const FUNCTION_SIGNATURES = [
   {
-    name: 'ERC-20',
-    signature: 'a9059cbb',
+    name: 'ERC-20 Contract',
+    signature: '61014060',
   },
   {
-    name: 'ERC-721',
-    signature: '23b872dd',
+    name: 'ERC-721 Contract',
+    signature: '60806040',
   },
   {
-    name: 'ERC-1155',
-    signature: 'f242432a',
+    name: 'ERC-1155 Contract',
+    signature: '60806040',
   },
 ];
 
@@ -31,6 +31,7 @@ const FUNCTION_SIGNATURES = [
  */
 export function decodeData(data: string) {
   const normalisedData = remove0x(data);
+  console.log('normalised data: ', normalisedData);
   const signature = normalisedData.slice(0, 8);
 
   const functionSignature = FUNCTION_SIGNATURES.find(
@@ -38,4 +39,38 @@ export function decodeData(data: string) {
   );
 
   return functionSignature?.name ?? 'Unknown';
+}
+
+/**
+ * Set a value in the encrypted state
+ *
+ * @param keyName name of the key
+ * @param newValue new value for the key
+ * @returns promise
+ */
+export async function saveValue(keyName: string, newValue: string) {
+  return await snap.request({
+    method: 'snap_setState',
+    params: {
+      key: keyName,
+      value: newValue,
+      encrypted: true,
+    },
+  });
+}
+
+/**
+ * Get a key value from the encrypted state
+ *
+ * @param keyName name of the key
+ * @returns the value for the key
+ */
+export async function getValue(keyName: string) {
+  return await snap.request({
+    method: 'snap_getState',
+    params: {
+      key: keyName,
+      encrypted: true,
+    },
+  });
 }
