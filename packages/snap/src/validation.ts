@@ -56,7 +56,7 @@ export function validateTransaction(
   // Perform validation checks
   // This is where you would add your specific validation logic
   if (!transaction || typeof transaction !== 'string') {
-    blockingIssues.push('Transaction must be a non-empty string');
+    //blockingIssues.push('Transaction must be a non-empty string');
   } else {
     // if (transaction.length < 10) {
     //   blockingIssues.push('Transaction is too short (minimum 10 characters)');
