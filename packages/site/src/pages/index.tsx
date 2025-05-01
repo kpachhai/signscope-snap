@@ -1,6 +1,6 @@
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { BrowserProvider, Contract, parseUnits } from 'ethers';
+import { BrowserProvider, Contract } from 'ethers';
 import { useState } from 'react';
 import styled from 'styled-components';
 
@@ -260,10 +260,10 @@ const TransferTokenComponent = () => {
         signer,
       ) as unknown as ERC20;
 
-      const decimals: number = await contract.decimals();
-      const parsedAmount = parseUnits(amount, decimals);
+      // const decimals: number = await contract.decimals();
+      // const parsedAmount = parseUnits(amount, decimals);
 
-      const tx = await contract.transfer(toAddress, parsedAmount);
+      const tx = await contract.transfer(toAddress, BigInt(amount));
       await tx.wait();
 
       alert(`Transaction sent! Hash: ${tx.hash}`);

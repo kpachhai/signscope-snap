@@ -7,15 +7,19 @@ import { remove0x } from '@metamask/utils';
  */
 const FUNCTION_SIGNATURES = [
   {
-    name: 'ERC-20 Contract',
+    name: 'ERC-20 Contract Creation',
     signature: '61014060',
   },
   {
-    name: 'ERC-721 Contract',
+    name: 'ERC-20 Transfer',
+    signature: 'a9059cbb',
+  },
+  {
+    name: 'ERC-721 Contract Creation',
     signature: '60806040',
   },
   {
-    name: 'ERC-1155 Contract',
+    name: 'ERC-1155 Contract Creation',
     signature: '60806040',
   },
 ];

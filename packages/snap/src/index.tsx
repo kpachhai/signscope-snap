@@ -9,7 +9,6 @@ import {
   panel,
   text,
   row,
-  address,
   UserInputEventType,
 } from '@metamask/snaps-sdk';
 import {
@@ -97,8 +96,7 @@ export const onTransaction: OnTransactionHandler = async ({
     const type = decodeData(transaction.data);
     return {
       content: panel([
-        row('From(EVM Address)', address(transactionFrom)),
-        row('From(Account Id)', text(accountInfo.accountId)),
+        row('From', text(accountInfo.accountId)),
         row('To', text(transactionTo)),
         row('Transaction type', text(type)),
       ]),
