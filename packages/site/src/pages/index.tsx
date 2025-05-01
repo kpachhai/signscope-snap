@@ -124,7 +124,7 @@ const Index = () => {
   return (
     <Container>
       <Heading>
-        Welcome to <Span>SignScope Service Snap(S4)</Span>
+        Welcome to <Span>SignScope Safeguard Service Snap(S5)</Span>
       </Heading>
       <CardContainer>
         {error && (
